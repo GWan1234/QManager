@@ -387,7 +387,7 @@ The poller maps the AT+QENG `state` field to `service_status` as follows:
 | **Network Status** | `network-status.tsx` | ✅ **DONE** | `data.network` + `data.modem_reachable` — network type icon, carrier, SIM slot, service status with pulsating rings, radio badge, loading skeletons, stale indicator |
 | **4G Primary Status** | `lte-status.tsx` | ✅ **DONE** | `data.lte` — band, EARFCN, PCI, RSRP, RSRQ, RSSI, SINR |
 | **5G Primary Status** | `nr-status.tsx` | ✅ **DONE** | `data.nr` — band, ARFCN, PCI, RSRP, RSRQ, SINR, SCS |
-| **Device Information** | `device-status.tsx` | ❌ Hardcoded | `data.device` — firmware, build date, manufacturer, IMEI, IMSI, ICCID, phone, LTE category, MIMO |
+| **Device Information** | `device-status.tsx` | ✅ **DONE** | `data.device` — firmware, build date, manufacturer, IMEI, IMSI, ICCID, phone, LTE category, MIMO |
 | **Device Metrics** | `device-metrics.tsx` | ❌ Hardcoded | `data.device` (temp, CPU, memory, uptime) + `data.traffic` (live traffic, data usage) |
 | **Live Latency** | `live-latency.tsx` | ❌ Hardcoded | Separate implementation (not from poller cache) |
 | **Recent Activities** | `recent-activities.tsx` | ❌ Hardcoded | Separate implementation (event log) |
@@ -582,7 +582,7 @@ This allows callers to distinguish lock contention from modem failures.
 ### Immediate Next Steps (Home Page)
 
 1. ~~**Wire `NrStatusComponent`** — Accept `data.nr` props, same pattern as LTE status.~~ ✅ Done
-2. **Wire `DeviceStatus`** — Accept `data.device` props for firmware, IMEI, IMSI, ICCID, phone, LTE category, MIMO, build date, manufacturer.
+2. ~~**Wire `DeviceStatus`** — Accept `data.device` props for firmware, IMEI, IMSI, ICCID, phone, LTE category, MIMO, build date, manufacturer.~~ ✅ Done
 3. **Wire `DeviceMetricsComponent`** — Accept `data.device` (temperature, CPU, memory, uptime) and `data.traffic` (live traffic, data usage). Implement warning badges for high temp/CPU.
 4. **Wire `SignalHistoryComponent`** — Replace mock data generator with real-time accumulation of `data.lte.rsrp/sinr` and `data.nr.rsrp/sinr` values using a client-side ring buffer.
 

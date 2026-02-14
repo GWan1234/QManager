@@ -35,7 +35,10 @@ const HomeComponent = () => {
         </div>
       </div>
       <div className="@xl/main:col-span-2 @5xl/main:col-span-2 col-span-1 h-full *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs *:data-[slot=card]:h-full">
-        <DeviceStatus />
+        <DeviceStatus
+          data={data?.device ?? null}
+          isLoading={isLoading}
+        />
       </div>
 
       <div className="col-span-1 xl:col-span-5">

@@ -76,24 +76,56 @@ function getNetworkDisplay(
   }
 }
 
-// --- Helper: Service status display ---
-function getServiceDisplay(status: ServiceStatus) {
+// --- Helper: Service status label ---
+function getServiceLabel(status: ServiceStatus) {
   switch (status) {
     case "optimal":
-      return { color: "green", label: "Optimal" };
+      return "Optimal";
     case "connected":
-      return { color: "blue", label: "Connected" };
+      return "Connected";
     case "limited":
-      return { color: "yellow", label: "Limited" };
+      return "Limited";
     case "no_service":
-      return { color: "red", label: "No Service" };
+      return "No Service";
     case "searching":
-      return { color: "yellow", label: "Searching" };
+      return "Searching";
     case "sim_error":
-      return { color: "red", label: "SIM Error" };
+      return "SIM Error";
     default:
-      return { color: "gray", label: "Unknown" };
+      return "Unknown";
   }
+}
+
+// --- Helper: Pulsating icon color based on network type ---
+// Green: LTE+ (CA), 5G-SA, 5G-NSA, SA with NR-CA
+// Yellow: single-band LTE or 3G
+// Red: no signal
+function getServiceColor(
+  type: string,
+  caActive: boolean,
+  serviceStatus: ServiceStatus
+): string {
+  // No service / no signal → red
+  if (
+    serviceStatus === "no_service" ||
+    serviceStatus === "sim_error" ||
+    !type
+  ) {
+    return "red";
+  }
+
+  // 5G (NSA or SA, with or without CA) → green
+  if (type === "5G-NSA" || type === "5G-SA") {
+    return "green";
+  }
+
+  // LTE with carrier aggregation (LTE+) → green
+  if (type === "LTE" && caActive) {
+    return "green";
+  }
+
+  // Single-band LTE or 3G → yellow
+  return "yellow";
 }
 
 // Color map for the pulsating service rings
@@ -107,12 +139,6 @@ const serviceColorMap: Record<
     ring3: "bg-green-400",
     center: "bg-green-600",
   },
-  blue: {
-    ring1: "bg-blue-200",
-    ring2: "bg-blue-300",
-    ring3: "bg-blue-400",
-    center: "bg-blue-600",
-  },
   yellow: {
     ring1: "bg-yellow-200",
     ring2: "bg-yellow-300",
@@ -124,12 +150,6 @@ const serviceColorMap: Record<
     ring2: "bg-red-300",
     ring3: "bg-red-400",
     center: "bg-red-600",
-  },
-  gray: {
-    ring1: "bg-gray-200",
-    ring2: "bg-gray-300",
-    ring3: "bg-gray-400",
-    center: "bg-gray-600",
   },
 };
 
@@ -148,9 +168,10 @@ const NetworkStatusComponent = ({
   const nrCaActive = data?.nr_ca_active ?? false;
 
   const networkDisplay = getNetworkDisplay(networkType, caActive, nrCaActive);
-  const serviceDisplay = getServiceDisplay(serviceStatus);
+  const serviceLabel = getServiceLabel(serviceStatus);
+  const serviceColor = getServiceColor(networkType, caActive, serviceStatus);
   const serviceColors =
-    serviceColorMap[serviceDisplay.color] ?? serviceColorMap.gray;
+    serviceColorMap[serviceColor] ?? serviceColorMap.red;
 
   // Radio is ON when the modem is reachable (AT+CFUN=1 implied by modem responding)
   const radioOn = modemReachable;
@@ -348,7 +369,7 @@ const NetworkStatusComponent = ({
               <div className="grid gap-0.5 text-center">
                 <h3 className="text-md font-semibold leading-none">Service</h3>
                 <p className="text-muted-foreground text-sm">
-                  {serviceDisplay.label}
+                  {serviceLabel}
                 </p>
               </div>
             </div>

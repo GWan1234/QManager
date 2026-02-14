@@ -1,9 +1,69 @@
-import React from "react";
+"use client";
 
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 
-const DeviceStatus = () => {
+import type { DeviceStatus } from "@/types/modem-status";
+
+interface DeviceStatusComponentProps {
+  data: DeviceStatus | null;
+  isLoading: boolean;
+}
+
+const DeviceStatusComponent = ({
+  data,
+  isLoading,
+}: DeviceStatusComponentProps) => {
+  const rows = [
+    { label: "Manufacturer", value: data?.manufacturer || "-" },
+    { label: "Model", value: "RM551E-GL" },
+    { label: "Firmware Version", value: data?.firmware || "-" },
+    { label: "Build Date", value: data?.build_date || "-" },
+    { label: "QManager Version", value: "0.0.1" },
+    { label: "Phone Number", value: data?.phone_number || "-", mono: true },
+    { label: "IMSI", value: data?.imsi || "-", mono: true },
+    { label: "ICCID", value: data?.iccid || "-", mono: true },
+    { label: "Device IMEI", value: data?.imei || "-", mono: true },
+    {
+      label: "LTE Category",
+      value: data?.lte_category ? `Cat ${data.lte_category}` : "-",
+      mono: true,
+    },
+    { label: "Active MIMO", value: data?.mimo || "-", mono: true },
+  ];
+
+  if (isLoading) {
+    return (
+      <Card className="@container/card col-span-2">
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl text-center">
+            Device Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <div className="flex items-center justify-center mb-8">
+              <Skeleton className="size-44 rounded-full" />
+            </div>
+            <div className="grid gap-2">
+              {Array.from({ length: 11 }).map((_, i) => (
+                <div key={i}>
+                  <Separator />
+                  <div className="flex items-center justify-between py-1">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-36" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="@container/card col-span-2">
       <CardHeader>
@@ -24,97 +84,23 @@ const DeviceStatus = () => {
           </div>
 
           <div className="grid gap-2">
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Manufacturer
-              </p>
-              <p className="font-semibold xl:text-md text-sm">Quectel</p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Model
-              </p>
-              <p className="font-semibold xl:text-md text-sm">RM551E-GL</p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Firmware Version
-              </p>
-              <p className="font-semibold xl:text-md text-sm">
-                RM551EGL00AAR01A04M8G
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Build Date
-              </p>
-              <p className="font-semibold xl:text-md text-sm">Jun 25 2025</p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                QManager Version
-              </p>
-              <p className="font-semibold xl:text-md text-sm">1.0.0-beta.5</p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Phone Number
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                +1 (555) 123-4567
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                IMSI
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                310260123456789
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                ICCID
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                8901260420001234567
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Device IMEI
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                866792052000123
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                LTE Category
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                Cat 20
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-muted-foreground xl:text-md text-sm">
-                Active MIMO
-              </p>
-              <p className="font-semibold xl:text-md text-sm tabular-nums">
-                LTE 4x4 | NR 4x4
-              </p>
-            </div>
+            {rows.map((row) => (
+              <React.Fragment key={row.label}>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-muted-foreground xl:text-md text-sm">
+                    {row.label}
+                  </p>
+                  <p
+                    className={`font-semibold xl:text-md text-sm ${
+                      row.mono ? "tabular-nums" : ""
+                    }`}
+                  >
+                    {row.value}
+                  </p>
+                </div>
+              </React.Fragment>
+            ))}
             <Separator />
           </div>
         </div>
@@ -123,4 +109,4 @@ const DeviceStatus = () => {
   );
 };
 
-export default DeviceStatus;
+export default DeviceStatusComponent;

@@ -11,6 +11,7 @@ import {
   MdSignalCellular3Bar,
   MdSignalCellular4Bar,
   MdSignalCellularOff,
+  MdOutlineSignalCellularConnectedNoInternet0Bar,
 } from "react-icons/md";
 
 import type { NrStatus } from "@/types/modem-status";
@@ -61,6 +62,7 @@ function getStateDisplay(state: string) {
 const NrStatusComponent = ({ data, isLoading }: NrStatusComponentProps) => {
   const state = data?.state ?? "unknown";
   const stateDisplay = getStateDisplay(state);
+  const isInactive = state === "inactive";
   const signalQuality = getSignalQuality(data?.rsrp ?? null, RSRP_THRESHOLDS);
 
   // Helper to format a signal value with unit, or show "-" if null
@@ -128,7 +130,11 @@ const NrStatusComponent = ({ data, isLoading }: NrStatusComponentProps) => {
                 </p>
               </div>
             </div>
-            {getSignalBarIcon(signalQuality)}
+            {isInactive ? (
+              <MdOutlineSignalCellularConnectedNoInternet0Bar className="w-10 h-10 text-muted-foreground" />
+            ) : (
+              getSignalBarIcon(signalQuality)
+            )}
           </div>
           <div className="grid">
             {rows.map((row) => (
