@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tooltip,
@@ -55,8 +55,33 @@ const DeviceMetricsComponent = ({
   const cpu = deviceData?.cpu_usage ?? null;
   const memUsed = deviceData?.memory_used_mb ?? 0;
   const memTotal = deviceData?.memory_total_mb ?? 0;
-  const connUptime = deviceData?.conn_uptime_seconds ?? 0;
-  const devUptime = deviceData?.uptime_seconds ?? 0;
+
+  // --- Smooth uptime: interpolate 1s ticks between 2s poll cycles ---
+  const [displayDevUptime, setDisplayDevUptime] = useState(0);
+  const [displayConnUptime, setDisplayConnUptime] = useState(0);
+  const [prevPollDev, setPrevPollDev] = useState(0);
+  const [prevPollConn, setPrevPollConn] = useState(0);
+
+  const pollDev = deviceData?.uptime_seconds ?? 0;
+  const pollConn = deviceData?.conn_uptime_seconds ?? 0;
+
+  // Adjust state during render when poll values change
+  // (React-recommended pattern for deriving state from props)
+  if (pollDev !== prevPollDev || pollConn !== prevPollConn) {
+    setPrevPollDev(pollDev);
+    setPrevPollConn(pollConn);
+    setDisplayDevUptime(pollDev);
+    setDisplayConnUptime(pollConn);
+  }
+
+  // Tick every second to keep uptime incrementing smoothly
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDisplayDevUptime((prev) => (prev > 0 ? prev + 1 : 0));
+      setDisplayConnUptime((prev) => (prev > 0 ? prev + 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const rxSpeed = trafficData?.rx_bytes_per_sec ?? 0;
   const txSpeed = trafficData?.tx_bytes_per_sec ?? 0;
@@ -261,7 +286,7 @@ const DeviceMetricsComponent = ({
               Connection Uptime
             </p>
             <p className="font-semibold text-sm tabular-nums">
-              {connUptime > 0 ? formatUptime(connUptime) : "-"}
+              {displayConnUptime > 0 ? formatUptime(displayConnUptime) : "-"}
             </p>
           </div>
 
@@ -272,7 +297,7 @@ const DeviceMetricsComponent = ({
               Device Uptime
             </p>
             <p className="font-semibold text-sm tabular-nums">
-              {devUptime > 0 ? formatUptime(devUptime) : "-"}
+              {displayDevUptime > 0 ? formatUptime(displayDevUptime) : "-"}
             </p>
           </div>
         </div>
