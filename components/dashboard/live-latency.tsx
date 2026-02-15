@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import {
@@ -18,15 +18,30 @@ import {
 import { Button } from "../ui/button";
 import { TbPlayerPlayFilled } from "react-icons/tb";
 
+import type { ConnectivityStatus } from "@/types/modem-status";
+
 export const description = "A multiple bar chart";
 
-const chartData = [
-  { time: "7:01", latency: 50, packetloss: 1 },
-  { time: "7:02", latency: 70, packetloss: 3 },
-  { time: "7:03", latency: 60, packetloss: 9 },
-  { time: "7:04", latency: 80, packetloss: 20 },
-  { time: "7:05", latency: 55, packetloss: 10 },
-];
+// =============================================================================
+// Data Wiring
+// =============================================================================
+// The ping daemon writes RTT history as (number | null)[] where null = timeout.
+// We show the last 5 data points. For each point:
+//   - latency: the RTT in ms (rounded), or 0 if timeout
+//   - packetloss: rolling % of null entries in a 10-sample window ending at
+//                 that point (gives a smoothed per-point loss indicator)
+// =============================================================================
+
+/** How many points to show on the chart */
+const CHART_POINTS = 5;
+
+/** Rolling window size for per-point packet loss calculation */
+const LOSS_WINDOW = 10;
+
+interface LiveLatencyComponentProps {
+  connectivity: ConnectivityStatus | null;
+  isLoading: boolean;
+}
 
 const chartConfig = {
   latency: {
@@ -39,7 +54,49 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const LiveLatencyComponent = () => {
+const LiveLatencyComponent = ({
+  connectivity,
+  isLoading,
+}: LiveLatencyComponentProps) => {
+  const chartData = useMemo(() => {
+    if (
+      !connectivity?.latency_history ||
+      connectivity.latency_history.length === 0
+    ) {
+      return [];
+    }
+
+    const history = connectivity.latency_history;
+    const interval = connectivity.history_interval_sec || 2;
+
+    // We need the last CHART_POINTS entries for display, but also preceding
+    // entries for the rolling packet-loss window calculation.
+    const endIdx = history.length;
+    const startIdx = Math.max(0, endIdx - CHART_POINTS);
+    const displaySlice = history.slice(startIdx, endIdx);
+
+    return displaySlice.map((rtt, i) => {
+      // Absolute index in the full history array
+      const absIdx = startIdx + i;
+
+      // Time label: seconds ago counting back from the most recent entry
+      const secsAgo = (displaySlice.length - 1 - i) * interval;
+      const timeLabel = secsAgo === 0 ? "Now" : `-${secsAgo}s`;
+
+      // Rolling packet loss: look back LOSS_WINDOW entries ending at absIdx
+      const windowStart = Math.max(0, absIdx - LOSS_WINDOW + 1);
+      const window = history.slice(windowStart, absIdx + 1);
+      const nullCount = window.filter((v) => v === null).length;
+      const lossPct = Math.round((nullCount / window.length) * 100);
+
+      return {
+        time: timeLabel,
+        latency: rtt !== null ? Math.round(rtt) : 0,
+        packetloss: lossPct,
+      };
+    });
+  }, [connectivity?.latency_history, connectivity?.history_interval_sec]);
+
   return (
     <Card className="@container/card">
       <CardHeader className="-mb-4">

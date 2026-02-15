@@ -51,7 +51,10 @@ const HomeComponent = () => {
             nrData={data?.nr ?? null}
             isLoading={isLoading}
           />
-          <LiveLatencyComponent />
+          <LiveLatencyComponent
+            connectivity={data?.connectivity ?? null}
+            isLoading={isLoading}
+          />
           <RecentActivitiesComponent />
         </div>
       </div>

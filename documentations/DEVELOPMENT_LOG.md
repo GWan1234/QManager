@@ -2,7 +2,7 @@
 
 **Project:** QManager — Custom GUI for Quectel RM551E-GL 5G Modem  
 **Platform:** OpenWRT (Embedded Linux)  
-**Last Updated:** February 15, 2026 (Phase 1–2 connectivity, connection uptime fix)
+**Last Updated:** February 15, 2026 (Phase 3: Live Latency component)
 
 ---
 
@@ -451,7 +451,7 @@ The poller maps the AT+QENG `state` field to `service_status` as follows:
 | **Device Information** | `device-status.tsx` | ✅ **DONE** | `data.device` — firmware, build date, manufacturer, IMEI, IMSI, ICCID, phone, LTE category, MIMO |
 | **Device Metrics** | `device-metrics.tsx` | ✅ **DONE** | `data.device` (temp, CPU, memory, uptime) + `data.traffic` (live traffic, data usage). Uptimes read directly from poll data (no client-side 1s tick — minutes are the smallest displayed unit). |
 | **Internet Badge** | `network-status.tsx` | ✅ **DONE** | `data.connectivity.internet_available` — three-state badge (green/red/gray for true/false/null). Replaced placeholder `hasInternet = isServiceActive`. |
-| **Live Latency** | `live-latency.tsx` | ❌ Pending | `data.connectivity` — latency_ms, latency_history, jitter, packet_loss (from unified ping daemon via poller merge) |
+| **Live Latency** | `live-latency.tsx` | ✅ **DONE** | `data.connectivity` — Line chart of last 5 RTT values, stats row (current/avg/jitter/loss), Online/Offline badge, loading skeleton, "ping daemon not running" fallback |
 | **Recent Activities** | `recent-activities.tsx` | ❌ Hardcoded | Separate implementation (event log) |
 | **Signal History** | `signal-history.tsx` | ❌ Mock data | `data.lte.rsrp/sinr` + `data.nr.rsrp/sinr` (accumulated client-side) |
 
@@ -669,7 +669,7 @@ This allows callers to distinguish lock contention from modem failures.
 11. ~~**Wire Internet badge**~~ ✅ Done — Three-state badge in `network-status.tsx`: green (true), red (false), gray (null/unknown). Replaced placeholder `hasInternet = isServiceActive`.
 12. ~~**Update init script**~~ ✅ Done — Multi-instance procd: ping (instance 1), poller (instance 2), watchcat placeholder (instance 3, commented out).
 13. ~~**Fix connection uptime**~~ ✅ Done — `update_conn_uptime()` now keyed off `conn_internet_available` (ping daemon) instead of `service_status` (modem registration). Three-state: `true` → count, `false` → reset, `null` → hold. Also added to scan path so timer stays accurate during AT+QSCAN.
-14. **Build Live Latency component** — Renders `connectivity.latency_ms` (big number), `connectivity.latency_history` (sparkline), secondary stats.
+14. ~~**Build Live Latency component**~~ ✅ Done — Line chart (last 5 history points), stats grid (current/avg/jitter/loss), Online/Offline badge, loading/empty states.
 15. **Build `qmanager_watchcat`** — State machine daemon. MONITOR→SUSPECT→RECOVERY→COOLDOWN→LOCKED. Reads ping data, executes tiered recovery (ifup → AT+CFUN → reboot). Token-bucket bootloop protection.
 16. **Wire watchcat state to UI** — Optional status indicator showing watchcat state, failure count, last recovery action.
 17. **Rename watchcat lock** — `/tmp/qmanager.lock` (from old Watchcat Architecture Guide) → `/tmp/qmanager_watchcat.lock` to prevent collision with serial port lock at `/var/lock/qmanager.lock`.
