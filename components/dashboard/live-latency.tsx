@@ -74,7 +74,7 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
     null,
   );
 
-  // Fetch any cached speedtest result on mount
+  // Fetch any cached speedtest result
   const fetchCachedResult = useCallback(async () => {
     try {
       const resp = await fetch(`${CGI_BASE}/speedtest_status.sh`);
@@ -88,9 +88,26 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
     }
   }, []);
 
+  // Fetch cached result on mount
   useEffect(() => {
-    fetchCachedResult();
-  }, [fetchCachedResult]);
+    let cancelled = false;
+    async function load() {
+      try {
+        const resp = await fetch(`${CGI_BASE}/speedtest_status.sh`);
+        if (!resp.ok || cancelled) return;
+        const data: SpeedtestStatusResponse = await resp.json();
+        if (!cancelled && data.status === "complete" && data.result) {
+          setCachedResult(data.result);
+        }
+      } catch {
+        // Silent — no cached result is fine
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSpeedtestOpen = useCallback(() => {
     setSpeedtestOpen(true);
@@ -155,8 +172,8 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
     const ul = formatSpeed(cachedResult.upload.bandwidth);
     const ping = cachedResult.ping.latency.toFixed(0);
     return (
-      <div className="flex items-center gap-x-4">
-        <p className="font-medium text-sm text-muted-foreground">
+      <div className="flex items-center gap-x-3">
+        <p className="font-medium text-sm text-muted-foreground xl:mr-2 mr-0">
           Speedtest result:
         </p>
         <div className="flex items-center gap-x-0.5">
@@ -166,11 +183,6 @@ const LiveLatencyComponent = ({ connectivity }: LiveLatencyComponentProps) => {
         <div className="flex items-center gap-x-0.5">
           <TbCircleArrowUpFilled className="text-purple-500 w-5 h-5"/>
           <p>{ul} Mbps</p>
-        </div>
-
-        <div className="flex items-center gap-x-0.5">
-          <TbTimeline className="text-green-500 w-5 h-5" />
-          <p>{ping} ms</p>
         </div>
       </div>
     );
