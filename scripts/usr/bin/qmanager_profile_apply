@@ -70,7 +70,7 @@ trap cleanup EXIT INT TERM
 # sms_tool returns: "AT+CMD\r\nRESPONSE\r\nOK"
 # We want only the content between the first line and the trailing OK/ERROR.
 strip_at_response() {
-    printf '%s' "$1" | sed '1d' | sed '/^OK$/d' | sed '/^ERROR$/d' | tr -d '\r'
+    printf '%s' "$1" | tr -d '\r' | sed '1d' | sed '/^OK$/d' | sed '/^ERROR$/d'
 }
 
 # --- Helper: Execute AT command via qcmd, return stripped response -----------
@@ -278,8 +278,9 @@ apply_apn() {
 
     # Parse current APN for the target CID
     # Response format: +CGDCONT: <cid>,"<pdp_type>","<apn>",...
+    # Using awk -F'"' — $2=pdp_type, $4=apn (same approach as current_settings.sh)
     local current_apn
-    current_apn=$(printf '%s' "$cgdcont_resp" | grep "+CGDCONT: ${p_apn_cid}," | sed -n 's/.*,"\([^"]*\)".*/\1/p' | head -1)
+    current_apn=$(printf '%s' "$cgdcont_resp" | grep "+CGDCONT: ${p_apn_cid}," | awk -F'"' '{print $4}' | head -1)
 
     # Skip if APN hasn't changed and no auth needed
     if [ "$current_apn" = "$p_apn_name" ] && [ "$p_auth_type" -eq 0 ] 2>/dev/null; then
@@ -365,14 +366,12 @@ apply_lte_bands() {
     if [ "$p_band_lock" = "true" ] && [ -n "$p_lte_bands" ]; then
         target_bands="$p_lte_bands"
     else
-        # Unlock all: query policy_band for full supported list
-        local policy_resp
-        policy_resp=$(run_at 'AT+QNWPREFCFG="policy_band"')
-        if [ $? -ne 0 ]; then
-            mark_step_failed "lte_bands" "Failed to query supported bands"
+        # Unlock all: use cached policy_band response
+        if [ -z "$cached_policy_band" ]; then
+            mark_step_failed "lte_bands" "No policy_band data available"
             return
         fi
-        target_bands=$(printf '%s' "$policy_resp" | grep '"lte_band"' | sed -n 's/.*"lte_band",\(.*\)/\1/p' | tr -d ' \r')
+        target_bands=$(printf '%s' "$cached_policy_band" | grep '"lte_band"' | sed -n 's/.*"lte_band",\(.*\)/\1/p' | tr -d ' \r')
     fi
 
     if [ -z "$target_bands" ]; then
@@ -415,13 +414,12 @@ apply_nsa_nr_bands() {
     if [ "$p_band_lock" = "true" ] && [ -n "$p_nsa_nr_bands" ]; then
         target_bands="$p_nsa_nr_bands"
     else
-        local policy_resp
-        policy_resp=$(run_at 'AT+QNWPREFCFG="policy_band"')
-        if [ $? -ne 0 ]; then
-            mark_step_failed "nsa_nr_bands" "Failed to query supported bands"
+        # Unlock all: use cached policy_band response
+        if [ -z "$cached_policy_band" ]; then
+            mark_step_failed "nsa_nr_bands" "No policy_band data available"
             return
         fi
-        target_bands=$(printf '%s' "$policy_resp" | grep '"nsa_nr5g_band"' | sed -n 's/.*"nsa_nr5g_band",\(.*\)/\1/p' | tr -d ' \r')
+        target_bands=$(printf '%s' "$cached_policy_band" | grep '"nsa_nr5g_band"' | sed -n 's/.*"nsa_nr5g_band",\(.*\)/\1/p' | tr -d ' \r')
     fi
 
     if [ -z "$target_bands" ]; then
@@ -463,13 +461,12 @@ apply_sa_nr_bands() {
     if [ "$p_band_lock" = "true" ] && [ -n "$p_sa_nr_bands" ]; then
         target_bands="$p_sa_nr_bands"
     else
-        local policy_resp
-        policy_resp=$(run_at 'AT+QNWPREFCFG="policy_band"')
-        if [ $? -ne 0 ]; then
-            mark_step_failed "sa_nr_bands" "Failed to query supported bands"
+        # Unlock all: use cached policy_band response
+        if [ -z "$cached_policy_band" ]; then
+            mark_step_failed "sa_nr_bands" "No policy_band data available"
             return
         fi
-        target_bands=$(printf '%s' "$policy_resp" | grep '"nr5g_band"' | sed -n 's/.*"nr5g_band",\(.*\)/\1/p' | tr -d ' \r')
+        target_bands=$(printf '%s' "$cached_policy_band" | grep '"nr5g_band"' | sed -n 's/.*"nr5g_band",\(.*\)/\1/p' | tr -d ' \r')
     fi
 
     if [ -z "$target_bands" ]; then
@@ -666,6 +663,16 @@ sleep "$CMD_GAP"
 
 apply_network_mode
 sleep "$CMD_GAP"
+
+# --- Pre-fetch policy_band for band steps (avoids 3 redundant modem queries) ---
+cached_policy_band=""
+if [ "$p_band_lock" != "true" ]; then
+    cached_policy_band=$(run_at 'AT+QNWPREFCFG="policy_band"')
+    if [ $? -ne 0 ] || [ -z "$cached_policy_band" ]; then
+        qlog_warn "Failed to query policy_band — band unlock steps may fail"
+    fi
+    sleep "$CMD_GAP"
+fi
 
 apply_lte_bands
 sleep "$CMD_GAP"

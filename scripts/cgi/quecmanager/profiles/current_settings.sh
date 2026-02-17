@@ -44,7 +44,7 @@ fi
 
 # --- Helper: Execute AT command via qcmd, return stripped response -----------
 strip_at_response() {
-    printf '%s' "$1" | sed '1d' | sed '/^OK$/d' | sed '/^ERROR$/d' | tr -d '\r'
+    printf '%s' "$1" | tr -d '\r' | sed '1d' | sed '/^OK$/d' | sed '/^ERROR$/d'
 }
 
 run_at() {
