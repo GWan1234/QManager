@@ -9,8 +9,14 @@ import {
   FieldLabel,
   FieldSet,
   FieldError,
-  FieldSeparator,
 } from "@/components/ui/field";
+
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import { TbInfoCircleFilled } from "react-icons/tb";
 
 import {
   Select,
@@ -144,7 +150,7 @@ const CustomProfileFormComponent = ({
   if (currentEditingId !== prevEditingId) {
     setPrevEditingId(currentEditingId);
     setForm(
-      editingProfile ? profileToFormData(editingProfile) : DEFAULT_FORM_STATE
+      editingProfile ? profileToFormData(editingProfile) : DEFAULT_FORM_STATE,
     );
     setErrors({});
     setSuccessMsg(null);
@@ -152,7 +158,9 @@ const CustomProfileFormComponent = ({
 
   // Pre-fill from current modem settings when loaded (create mode only)
   // Compare during render instead of useEffect to avoid cascading setState.
-  const [prevSettings, setPrevSettings] = useState<CurrentModemSettings | null>(null);
+  const [prevSettings, setPrevSettings] = useState<CurrentModemSettings | null>(
+    null,
+  );
 
   if (currentSettings && currentSettings !== prevSettings && !isEditing) {
     setPrevSettings(currentSettings);
@@ -186,7 +194,7 @@ const CustomProfileFormComponent = ({
 
   const updateField = <K extends keyof ProfileFormData>(
     key: K,
-    value: ProfileFormData[K]
+    value: ProfileFormData[K],
   ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
@@ -266,7 +274,7 @@ const CustomProfileFormComponent = ({
       setSuccessMsg(
         isEditing
           ? "Profile updated successfully."
-          : "Profile created successfully."
+          : "Profile created successfully.",
       );
       if (!isEditing) {
         setForm(DEFAULT_FORM_STATE);
@@ -287,74 +295,42 @@ const CustomProfileFormComponent = ({
   return (
     <Card className="@container/card">
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle>
-              {isEditing ? "Edit Profile" : "Create Custom SIM Profile"}
-            </CardTitle>
-            <CardDescription>
-              {isEditing
-                ? `Editing "${editingProfile?.name}". Update the fields below.`
-                : "Fill out the form below to create a custom SIM profile."}
-            </CardDescription>
-          </div>
+        <CardTitle>
+          {isEditing ? "Edit Profile" : "Create Custom SIM Profile"}
+        </CardTitle>
+        <CardDescription>
+          {isEditing
+            ? `Editing "${editingProfile?.name}". Update the fields below.`
+            : "Fill out the form below to create a custom SIM profile."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex w-full justify-end">
           {!isEditing && onLoadCurrentSettings && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onLoadCurrentSettings}
-            >
-              <DownloadIcon className="mr-1.5 h-3.5 w-3.5" />
-              Load Current
+            <Button type="button" size="sm" onClick={onLoadCurrentSettings}>
+              <DownloadIcon className="w-4 h-4" />
+              Load Current SIM
             </Button>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
+
         <form onSubmit={handleSubmit} className="grid gap-4">
           <FieldSet>
             <FieldGroup>
               {/* --- Profile Identity --- */}
-              <Field>
-                <FieldLabel htmlFor="profileName">Profile Name *</FieldLabel>
-                <Input
-                  id="profileName"
-                  type="text"
-                  placeholder="My LTE Profile"
-                  value={form.name}
-                  onChange={(e) => updateField("name", e.target.value)}
-                />
-                {errors.name && <FieldError>{errors.name}</FieldError>}
-              </Field>
-
               <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>Mobile Network Operator</FieldLabel>
-                  <Select
-                    value={selectedMno}
-                    onValueChange={handleMnoChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select carrier…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MNO_PRESETS.map((preset) => (
-                        <SelectItem key={preset.id} value={preset.id}>
-                          {preset.label}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={MNO_CUSTOM_ID}>
-                        Custom
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>
-                    {selectedMno === MNO_CUSTOM_ID
-                      ? "All fields below must be configured manually."
-                      : "APN, CID, TTL, and HL pre-filled from preset."}
-                  </FieldDescription>
+                  <FieldLabel htmlFor="profileName">Profile Name *</FieldLabel>
+                  <Input
+                    id="profileName"
+                    type="text"
+                    placeholder="My LTE Profile"
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                  />
+                  {errors.name && <FieldError>{errors.name}</FieldError>}
                 </Field>
+
                 <Field>
                   <FieldLabel htmlFor="simIccid">SIM ICCID</FieldLabel>
                   <Input
@@ -364,15 +340,27 @@ const CustomProfileFormComponent = ({
                     value={form.sim_iccid}
                     onChange={(e) => updateField("sim_iccid", e.target.value)}
                   />
-                  <FieldDescription>
-                    Auto-filled from current SIM. Editable if creating for a different SIM.
-                  </FieldDescription>
                 </Field>
               </div>
 
-              <FieldSeparator>APN Settings</FieldSeparator>
+              <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
+                <Field>
+                  <FieldLabel>Mobile Network Operator</FieldLabel>
+                  <Select value={selectedMno} onValueChange={handleMnoChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select carrier…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MNO_PRESETS.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={MNO_CUSTOM_ID}>Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-              <div className="grid grid-cols-1 @md/card:grid-cols-3 gap-4">
                 <Field>
                   <FieldLabel htmlFor="apnName">APN Name</FieldLabel>
                   <Input
@@ -383,6 +371,9 @@ const CustomProfileFormComponent = ({
                     onChange={(e) => updateField("apn_name", e.target.value)}
                   />
                 </Field>
+              </div>
+
+              <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel>PDP Type</FieldLabel>
                   <Select
@@ -419,25 +410,45 @@ const CustomProfileFormComponent = ({
                 </Field>
               </div>
 
-              <FieldSeparator>Device Settings</FieldSeparator>
+              <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
+                <Field>
+                  <FieldLabel>Network Mode</FieldLabel>
+                  <Select
+                    value={form.network_mode}
+                    onValueChange={(v) => updateField("network_mode", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        Object.entries(NETWORK_MODE_LABELS) as [
+                          NetworkModePreference,
+                          string,
+                        ][]
+                      ).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="imei">Preferred IMEI</FieldLabel>
+                  <Input
+                    id="imei"
+                    type="text"
+                    placeholder="Leave blank to keep current IMEI"
+                    maxLength={15}
+                    value={form.imei}
+                    onChange={(e) => updateField("imei", e.target.value)}
+                  />
+                  {errors.imei && <FieldError>{errors.imei}</FieldError>}
+                </Field>
+              </div>
 
-              <Field>
-                <FieldLabel htmlFor="imei">Preferred IMEI</FieldLabel>
-                <Input
-                  id="imei"
-                  type="text"
-                  placeholder="Leave blank to keep current IMEI"
-                  maxLength={15}
-                  value={form.imei}
-                  onChange={(e) => updateField("imei", e.target.value)}
-                />
-                {errors.imei && <FieldError>{errors.imei}</FieldError>}
-                <FieldDescription>
-                  15 digits. Changing IMEI requires a modem reboot.
-                </FieldDescription>
-              </Field>
-
-              <div className="grid grid-cols-1 @md/card:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
                 <Field>
                   <FieldLabel htmlFor="ttl">TTL Value</FieldLabel>
                   <Input
@@ -466,51 +477,28 @@ const CustomProfileFormComponent = ({
                   />
                   {errors.hl && <FieldError>{errors.hl}</FieldError>}
                 </Field>
-                <Field>
-                  <FieldLabel>Network Mode</FieldLabel>
-                  <Select
-                    value={form.network_mode}
-                    onValueChange={(v) => updateField("network_mode", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        Object.entries(NETWORK_MODE_LABELS) as [
-                          NetworkModePreference,
-                          string,
-                        ][]
-                      ).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
               </div>
 
-              <FieldSeparator>Band Locking</FieldSeparator>
-
-              <Field orientation="horizontal">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <FieldLabel htmlFor="bandLockEnabled">
-                      Enable Band Locking
-                    </FieldLabel>
-                    <FieldDescription>
-                      When disabled, the modem uses all available bands.
-                    </FieldDescription>
-                  </div>
-                  <Switch
-                    id="bandLockEnabled"
-                    checked={form.band_lock_enabled}
-                    onCheckedChange={(checked) =>
-                      updateField("band_lock_enabled", checked)
-                    }
-                  />
-                </div>
+              <Field orientation="horizontal" className="w-fit">
+                <FieldLabel htmlFor="backup-imei">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TbInfoCircleFilled className="w-5 h-5 text-blue-500" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {/* Will show in Hexadecimal form */}
+                      <p>When disabled, the modem uses all available bands.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  Enable Band Locking
+                </FieldLabel>
+                <Switch
+                  id="bandLockEnabled"
+                  checked={form.band_lock_enabled}
+                  onCheckedChange={(checked) =>
+                    updateField("band_lock_enabled", checked)
+                  }
+                />
               </Field>
 
               {form.band_lock_enabled && (
@@ -526,18 +514,13 @@ const CustomProfileFormComponent = ({
                           : "e.g., 1:3:7:28:40"
                       }
                       value={form.lte_bands}
-                      onChange={(e) =>
-                        updateField("lte_bands", e.target.value)
-                      }
+                      onChange={(e) => updateField("lte_bands", e.target.value)}
                     />
                     {errors.lte_bands && (
                       <FieldError>{errors.lte_bands}</FieldError>
                     )}
                     <FieldDescription>
                       Colon-separated band numbers.
-                      {currentSettings?.supported_lte_bands && (
-                        <> Hardware supports: {currentSettings.supported_lte_bands}</>
-                      )}
                     </FieldDescription>
                   </Field>
                   <div className="grid grid-cols-1 @md/card:grid-cols-2 gap-4">
@@ -563,9 +546,7 @@ const CustomProfileFormComponent = ({
                       )}
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="saNrBands">
-                        SA NR5G Bands
-                      </FieldLabel>
+                      <FieldLabel htmlFor="saNrBands">SA NR5G Bands</FieldLabel>
                       <Input
                         id="saNrBands"
                         type="text"
@@ -596,7 +577,7 @@ const CustomProfileFormComponent = ({
 
               <div className="flex gap-3 pt-2">
                 <Button type="submit" disabled={isSaving}>
-                  {isSaving && <Spinner className="mr-2 h-4 w-4" />}
+                  {isSaving && <Spinner className="h-4 w-4" />}
                   {isEditing ? "Update Profile" : "Create Profile"}
                 </Button>
                 <Button

@@ -4,6 +4,8 @@ import "./globals.css";
 import Euclid from "next/font/local";
 import { Manrope } from "next/font/google";
 
+import { Toaster } from "@/components/ui/sonner";
+
 // Google Fonts can be imported from remote
 export const manrope = Manrope({
   subsets: ["latin"],
@@ -59,6 +61,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${euclid.className} antialiased`}>{children}</body>
+      <Toaster />
     </html>
   );
 }
