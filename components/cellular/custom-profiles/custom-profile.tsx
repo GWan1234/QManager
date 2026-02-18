@@ -46,7 +46,6 @@ const CustomProfileComponent = () => {
 
   const {
     applyState,
-    isApplying,
     applyProfile,
     reset: resetApply,
     error: applyError,

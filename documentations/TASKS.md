@@ -1,6 +1,6 @@
 # QManager Task Tracker
 
-**Last Updated:** February 17, 2026
+**Last Updated:** February 18, 2026
 
 This file tracks component wiring progress, active work, and remaining tasks.  
 For architecture, AT command reference, JSON contract, and deployment notes, see `DEVELOPMENT_LOG.md`.
@@ -72,6 +72,62 @@ All 10 home page components are wired to live data and functional.
 | EARFCN utility (`lib/earfcn.ts`) | DL/UL frequency calc, band name lookup, duplex mode. LTE (3GPP TS 36.101) + NR (3GPP TS 38.104 global raster). NR overlap resolution via band hint. | ✅ Done |
 | Active Bands enhancements | Badge shows duplex mode (FDD/TDD/SDL). Accordion header shows EARFCN. Expanded detail shows Band Name, DL Frequency, UL Frequency. | ✅ Done |
 
+### Custom SIM Profiles (`/cellular/custom-profiles`) — ✅ COMPLETE
+
+Full CRUD + async apply pipeline for SIM identity/connectivity profiles.
+
+| Component | File | Status | Notes |
+|-----------|------|--------|-------|
+| **Profile Form** | `custom-profile-form.tsx` | ✅ Done | Create/edit form. MNO presets, APN/CID/PDP, IMEI, TTL/HL. "Load Current SIM" pre-fill via `useCurrentSettings`. Render-time state sync (no useEffect). |
+| **Profile List** | `custom-profile-table.tsx` | ✅ Done | Data table with Activate/Edit/Delete actions, active badge. |
+| **Profile View** | `custom-profile-view.tsx` | ✅ Done | Card wrapper. Toggles between table and empty state. |
+| **Page Coordinator** | `custom-profile.tsx` | ✅ Done | Owns 3 hooks (`useSimProfiles`, `useProfileApply`, `useCurrentSettings`). Confirmation dialog, progress dialog. |
+| **Apply Progress** | `apply-progress-dialog.tsx` | ✅ Done | Generic step-by-step progress dialog. Reads step names from state file. |
+
+**Backend:**
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `profile_mgr.sh` | CRUD library (list, get, save, delete, validate). BusyBox-safe JSON construction. 10-profile limit. | ✅ Done |
+| `qmanager_profile_apply` | Detached 3-step apply: APN → TTL/HL → IMEI. Smart diffing (skips unchanged). Modem reboot handling for IMEI. | ✅ Done |
+| `profiles/list.sh` | GET — profiles array + active ID | ✅ Done |
+| `profiles/get.sh` | GET — single profile JSON | ✅ Done |
+| `profiles/save.sh` | POST — create/update | ✅ Done |
+| `profiles/delete.sh` | POST — delete + cleanup | ✅ Done |
+| `profiles/apply.sh` | POST — async spawn via setsid | ✅ Done |
+| `profiles/apply_status.sh` | GET — read state file | ✅ Done |
+| `profiles/current_settings.sh` | GET — APN/IMEI/ICCID from modem | ✅ Done |
+
+**Architecture note:** Band locking and network mode were removed from SIM Profiles. Profiles are identity-only: APN, IMEI, TTL/HL. Radio/RF configuration (bands, network mode) is owned by Connection Scenarios.
+
+### Connection Scenarios (`/cellular/custom-profiles/connection-scenarios`) — ✅ COMPLETE
+
+Radio/RF configuration layer. Controls modem network mode via `AT+QNWPREFCFG="mode_pref"`.
+
+| Component | File | Status | Notes |
+|-----------|------|--------|-------|
+| **Scenario Cards** | `scenario-item.tsx` | ✅ Done | Gradient cards with SVG patterns, active ring, delete for custom. |
+| **Active Config** | `active-config-card.tsx` | ✅ Done | Shows active scenario config (bands, mode, optimization). "Applying…" badge during activation. |
+| **Add Dialog** | `connection-scenario-card.tsx` | ✅ Done | Create custom scenario with name, description, gradient theme picker. |
+| **Page Coordinator** | `connection-scenario-card.tsx` | ✅ Done | Owns `useConnectionScenarios` hook. Wires activation to backend. Toast feedback. |
+
+**Default scenarios (built-in, cannot be edited/deleted):**
+
+| Scenario | AT Command | Behavior |
+|----------|------------|----------|
+| **Balanced** | `AT+QNWPREFCFG="mode_pref",AUTO` | Modem decides. Band Locking page governs. |
+| **Gaming** | `AT+QNWPREFCFG="mode_pref",NR5G` | Force SA only (lowest latency). |
+| **Streaming** | `AT+QNWPREFCFG="mode_pref",LTE:NR5G` | SA + NSA + LTE fallback (max bandwidth). |
+
+**Backend:**
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `scenarios/activate.sh` | POST — maps scenario ID → AT mode_pref command via `qcmd`, persists to `/etc/qmanager/active_scenario` | ✅ Done |
+| `scenarios/active.sh` | GET — reads active scenario ID, defaults to "balanced" | ✅ Done |
+
+**Architecture note:** Activation is synchronous (single AT command, ~200ms) — no async pipeline or progress dialog needed. Custom scenarios (`custom-*`) are client-side only for now; backend activation returns `not_implemented`.
+
 ---
 
 ## Remaining Work
@@ -92,6 +148,14 @@ All 10 home page components are wired to live data and functional.
 | 5 | **Build `qmanager_watchcat`** | ⬜ TODO | State machine daemon: MONITOR→SUSPECT→RECOVERY→COOLDOWN→LOCKED. Reads ping data, tiered recovery (ifup → AT+CFUN → reboot). Token-bucket bootloop protection. |
 | 6 | **Wire watchcat state to UI** | ⬜ TODO | Status indicator: watchcat state, failure count, last recovery action. |
 | 7 | **Rename watchcat lock** | ⬜ TODO | `/tmp/qmanager.lock` → `/tmp/qmanager_watchcat.lock` to avoid collision with serial port lock. |
+
+### Connection Scenarios — Deferred Enhancements
+
+| # | Task | Status | Notes |
+|---|------|--------|-------|
+| 10 | **Band Locking page interaction** | ⬜ DEFERRED | When a non-Balanced scenario is active (Gaming, Streaming, custom), the Band Locking page (`/cellular/settings/band-locking`) and Network Mode component should disable their input fields and show a banner: "Network mode is managed by the active Connection Scenario (Gaming). Switch to Balanced to regain manual control." Balanced scenario = manual mode (user's Band Locking settings apply). Non-Balanced = override mode (scenario controls network mode, inputs disabled). |
+| 11 | **Custom scenario backend persistence** | ⬜ DEFERRED | Currently custom scenarios are client-side only (lost on refresh). Future: `/etc/qmanager/scenarios/<id>.json` storage, CRUD CGI endpoints (`save.sh`, `delete.sh`, `list.sh`), `scenario_mgr.sh` library mirroring `profile_mgr.sh` pattern. |
+| 12 | **Custom scenario band locking** | ⬜ DEFERRED | Custom scenarios could configure both network mode AND band locks. Apply script would need multi-step async pipeline (like SIM Profile apply) with `AT+QNWPREFCFG="lte_band"`, `"nsa_nr5g_band"`, `"nr5g_band"` commands. |
 
 ### Backend Improvements
 
@@ -119,6 +183,9 @@ All 10 home page components are wired to live data and functional.
 - ~~TA-based cell distance~~ ✅ — LTE + NR, 3GPP formulas, BusyBox-safe parsing
 - ~~NSA SCS parsing~~ ✅ — Fixed `\r` carriage return on last CSV field
 - ~~Active Bands card~~ ✅ — Per-carrier QCAINFO parser rework, JSON array output, NR_SNR /100 conversion, accordion UI, `lib/earfcn.ts` (DL/UL frequency, band name, duplex mode), badge shows FDD/TDD
+- ~~Custom SIM Profiles~~ ✅ — Full CRUD + async 3-step apply (APN→TTL/HL→IMEI). Backend: `profile_mgr.sh` library, `qmanager_profile_apply` detached script, 9 CGI endpoints. Frontend: form with MNO presets, table with actions, apply progress dialog, 3 hooks. Band locking removed — identity-only profiles.
+- ~~Connection Scenarios~~ ✅ — 3 default scenarios (Balanced/Gaming/Streaming) mapped to `AT+QNWPREFCFG="mode_pref"`. Synchronous activation (single AT command). Backend: `activate.sh` + `active.sh` CGI endpoints. Frontend: `useConnectionScenarios` hook wired to existing gradient card UI. Toast feedback, activation guard.
+- ~~Band removal from SIM Profiles~~ ✅ — Stripped `network_mode`, `lte_bands`, `nsa_nr_bands`, `sa_nr_bands`, `band_lock_enabled` from all layers (types, hooks, form, backend scripts, CGI endpoints). Cleaned dead validators and stale step labels.
 
 </details>
 
