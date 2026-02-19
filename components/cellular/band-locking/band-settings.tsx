@@ -1,5 +1,6 @@
-import React from "react";
+"use client";
 
+import React from "react";
 import {
   Card,
   CardContent,
@@ -15,11 +16,119 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { TbInfoCircleFilled } from "react-icons/tb";
 import { Badge } from "@/components/ui/badge";
-import { TriangleAlertIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TbInfoCircleFilled } from "react-icons/tb";
+import { TriangleAlertIcon, CheckCircle2Icon, MinusCircleIcon } from "lucide-react";
+import { toast } from "sonner";
+import type { FailoverState } from "@/types/band-locking";
+import type { CarrierComponent } from "@/types/modem-status";
 
-const BandSettingsComponent = () => {
+// =============================================================================
+// BandSettingsComponent — Failover Toggle + Active Bands Display
+// =============================================================================
+// Props come from BandLockingComponent (coordinator).
+// Active bands are derived from carrier_components (QCAINFO data).
+// =============================================================================
+
+interface BandSettingsProps {
+  /** Failover toggle + activation state */
+  failover: FailoverState;
+  /** Active carrier components from useModemStatus (QCAINFO Tier 2) */
+  carrierComponents: CarrierComponent[];
+  /** Callback to toggle failover on/off */
+  onToggleFailover: (enabled: boolean) => Promise<boolean>;
+  /** True while initial data is loading */
+  isLoading: boolean;
+}
+
+/**
+ * Extract unique active band names from carrier_components for a given technology.
+ * Returns sorted, comma-separated display string (e.g., "B1, B3, B7").
+ */
+function getActiveBandDisplay(
+  components: CarrierComponent[],
+  technology: "LTE" | "NR",
+): string {
+  const bands = components
+    .filter((c) => c.technology === technology)
+    .map((c) => c.band)
+    .filter(Boolean);
+
+  // Deduplicate (same band can appear as PCC + SCC in rare cases)
+  const unique = [...new Set(bands)];
+
+  if (unique.length === 0) return "—";
+
+  // Sort numerically by band number (strip prefix for comparison)
+  unique.sort((a, b) => {
+    const numA = parseInt(a.replace(/^[BN]/, ""), 10);
+    const numB = parseInt(b.replace(/^[BN]/, ""), 10);
+    return numA - numB;
+  });
+
+  return unique.join(", ");
+}
+
+const BandSettingsComponent = ({
+  failover,
+  carrierComponents,
+  onToggleFailover,
+  isLoading,
+}: BandSettingsProps) => {
+  // --- Derive active bands from carrier_components --------------------------
+  const activeLte = getActiveBandDisplay(carrierComponents, "LTE");
+  const activeNr = getActiveBandDisplay(carrierComponents, "NR");
+
+  // --- Failover toggle handler ----------------------------------------------
+  const handleFailoverToggle = async (checked: boolean) => {
+    const success = await onToggleFailover(checked);
+    if (success) {
+      toast.success(`Failover ${checked ? "enabled" : "disabled"}`);
+    } else {
+      toast.error("Failed to toggle failover");
+    }
+  };
+
+  // --- Failover status badge ------------------------------------------------
+  const renderFailoverStatus = () => {
+    if (isLoading) return <Skeleton className="h-5 w-32" />;
+
+    if (!failover.enabled) {
+      return (
+        <Badge
+          variant="outline"
+          className="bg-muted/50 text-muted-foreground border-muted-foreground/30"
+        >
+          <MinusCircleIcon className="mr-1 h-3 w-3" />
+          Disabled
+        </Badge>
+      );
+    }
+
+    if (failover.activated) {
+      return (
+        <Badge
+          variant="outline"
+          className="bg-orange-500/20 text-orange-500 hover:bg-orange-500/30 border border-orange-300/50 backdrop-blur-sm"
+        >
+          <TriangleAlertIcon className="mr-1 h-3 w-3" />
+          Using Default Bands
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge
+        variant="outline"
+        className="bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30 border border-emerald-300/50 backdrop-blur-sm"
+      >
+        <CheckCircle2Icon className="mr-1 h-3 w-3" />
+        Ready
+      </Badge>
+    );
+  };
+
   return (
     <Card className="@container/card">
       <CardHeader>
@@ -31,6 +140,8 @@ const BandSettingsComponent = () => {
       <CardContent>
         <div className="grid gap-2">
           <Separator />
+
+          {/* Failover Toggle */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Tooltip>
@@ -40,7 +151,8 @@ const BandSettingsComponent = () => {
                 <TooltipContent>
                   <p>
                     When enabled, the device will automatically switch to the
-                    default bands if the locked bands are unavailable.
+                    default bands if the locked bands are unavailable after 15
+                    seconds.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -49,52 +161,61 @@ const BandSettingsComponent = () => {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Switch id="band-failover" checked />
-              <Label htmlFor="band-failover">Enabled</Label>
+              {isLoading ? (
+                <Skeleton className="h-5 w-20" />
+              ) : (
+                <>
+                  <Switch
+                    id="band-failover"
+                    checked={failover.enabled}
+                    onCheckedChange={handleFailoverToggle}
+                  />
+                  <Label htmlFor="band-failover">
+                    {failover.enabled ? "Enabled" : "Disabled"}
+                  </Label>
+                </>
+              )}
             </div>
           </div>
           <Separator />
+
+          {/* Failover Status */}
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-muted-foreground ">
+            <p className="text-sm font-semibold text-muted-foreground">
               Failover Status
             </p>
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold ">
-                <Badge
-                  variant="outline"
-                  className="bg-orange-500/20 text-orange-500 hover:bg-orange-500/30 border border-orange-300/50 backdrop-blur-sm"
-                >
-                  <TriangleAlertIcon/>
-                  Using Default Bands
-                </Badge>
-              </p>
+              {renderFailoverStatus()}
             </div>
           </div>
           <Separator />
+
+          {/* Active LTE Bands */}
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-muted-foreground ">
+            <p className="text-sm font-semibold text-muted-foreground">
               Active LTE Bands
             </p>
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold ">B1, B3, B7, B20</p>
+              {isLoading ? (
+                <Skeleton className="h-4 w-28" />
+              ) : (
+                <p className="text-sm font-semibold">{activeLte}</p>
+              )}
             </div>
           </div>
           <Separator />
+
+          {/* Active NR Bands */}
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-muted-foreground ">
-              Active NR5G NSA Bands
+            <p className="text-sm font-semibold text-muted-foreground">
+              Active NR5G Bands
             </p>
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold ">N41, N78</p>
-            </div>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-muted-foreground ">
-              Active NR5G SA Bands
-            </p>
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold ">N78</p>
+              {isLoading ? (
+                <Skeleton className="h-4 w-20" />
+              ) : (
+                <p className="text-sm font-semibold">{activeNr}</p>
+              )}
             </div>
           </div>
           <Separator />

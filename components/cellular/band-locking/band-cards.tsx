@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -13,120 +12,253 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { RotateCcwIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { LockIcon, LockOpenIcon, RotateCcwIcon } from "lucide-react";
+import { toast } from "sonner";
+import { formatBandName, type BandCategory } from "@/types/band-locking";
 
-// Mock data for prototyping
-const mockBands = {
-  lte: [
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "7",
-    "8",
-    "12",
-    "13",
-    "14",
-    "17",
-    "18",
-    "19",
-    "20",
-    "25",
-    "26",
-    "28",
-    "29",
-    "30",
-    "32",
-    "34",
-    "38",
-    "39",
-    "40",
-    "41",
-    "42",
-    "43",
-    "46",
-    "48",
-    "66",
-    "71",
-  ],
-  nr: [
-    "1",
-    "2",
-    "3",
-    "5",
-    "7",
-    "8",
-    "12",
-    "14",
-    "20",
-    "25",
-    "28",
-    "29",
-    "30",
-    "38",
-    "40",
-    "41",
-    "48",
-    "66",
-    "71",
-    "77",
-    "78",
-    "79",
-    "257",
-    "258",
-    "260",
-    "261",
-  ],
-};
+// =============================================================================
+// BandCardsComponent — Per-Category Band Checkbox Grid + Lock/Unlock Actions
+// =============================================================================
+// One instance per band category (LTE, NSA NR5G, SA NR5G).
+// All data flows in via props from BandLockingComponent (coordinator).
+//
+// Local state: checkbox selection (initialized from currentLockedBands).
+// Parent owns the CGI communication — this component only calls onLock/onUnlockAll.
+// =============================================================================
 
 interface BandCardsProps {
   title: string;
   description: string;
-  bandType: "lte" | "nr";
-  prefix: string;
+  /** Which band category this card manages */
+  bandCategory: BandCategory;
+  /** All hardware-supported bands for this category (from policy_band, sorted) */
+  supportedBands: number[];
+  /** Currently locked/configured bands (from ue_capability_band, sorted) */
+  currentLockedBands: number[];
+  /** Lock selected bands — returns success boolean */
+  onLock: (bands: number[]) => Promise<boolean>;
+  /** Unlock all bands (reset to full supported list) — returns success boolean */
+  onUnlockAll: () => Promise<boolean>;
+  /** True while any lock/unlock operation is in flight (shared across all cards) */
+  isLocking: boolean;
+  /** True while initial data is loading */
+  isLoading: boolean;
+  /** Error from the hook (shared) */
+  error: string | null;
 }
 
 const BandCardsComponent = ({
   title,
   description,
-  bandType,
-  prefix,
+  bandCategory,
+  supportedBands,
+  currentLockedBands,
+  onLock,
+  onUnlockAll,
+  isLocking,
+  isLoading,
+  error,
 }: BandCardsProps) => {
-  const [checkedBands, setCheckedBands] = useState<string[]>([]);
+  // --- Local checkbox state (number set for O(1) lookup) --------------------
+  const [checkedBands, setCheckedBands] = useState<Set<number>>(new Set());
 
-  const handleCheckboxChange = (band: string) => {
-    setCheckedBands((prev) =>
-      prev.includes(band) ? prev.filter((b) => b !== band) : [...prev, band]
+  // Sync local state when currentLockedBands changes (initial load or after lock)
+  useEffect(() => {
+    if (currentLockedBands.length > 0) {
+      setCheckedBands(new Set(currentLockedBands));
+    }
+  }, [currentLockedBands]);
+
+  // --- Derived state --------------------------------------------------------
+  const isAllUnlocked = useMemo(() => {
+    if (supportedBands.length === 0 || currentLockedBands.length === 0) return false;
+    return (
+      currentLockedBands.length === supportedBands.length &&
+      currentLockedBands.every((b) => supportedBands.includes(b))
     );
+  }, [supportedBands, currentLockedBands]);
+
+  // Whether the user's selection differs from what's currently on the modem
+  const hasChanges = useMemo(() => {
+    if (currentLockedBands.length !== checkedBands.size) return true;
+    return currentLockedBands.some((b) => !checkedBands.has(b));
+  }, [currentLockedBands, checkedBands]);
+
+  const noneSelected = checkedBands.size === 0;
+
+  // --- Handlers -------------------------------------------------------------
+  const handleCheckboxChange = (band: number) => {
+    setCheckedBands((prev) => {
+      const next = new Set(prev);
+      if (next.has(band)) {
+        next.delete(band);
+      } else {
+        next.add(band);
+      }
+      return next;
+    });
   };
+
+  const handleSelectAll = () => {
+    setCheckedBands(new Set(supportedBands));
+  };
+
+  const handleSelectNone = () => {
+    setCheckedBands(new Set());
+  };
+
+  const handleLock = async () => {
+    const bands = [...checkedBands].sort((a, b) => a - b);
+    if (bands.length === 0) {
+      toast.error("Select at least one band to lock");
+      return;
+    }
+
+    const success = await onLock(bands);
+    if (success) {
+      toast.success(`${title.replace(" Locking", "")} bands locked successfully`);
+    } else {
+      toast.error(error || "Failed to apply band lock");
+    }
+  };
+
+  const handleUnlockAll = async () => {
+    const success = await onUnlockAll();
+    if (success) {
+      toast.success(`${title.replace(" Locking", "")} bands unlocked`);
+    } else {
+      toast.error(error || "Failed to unlock bands");
+    }
+  };
+
+  // --- Loading skeleton -----------------------------------------------------
+  if (isLoading) {
+    return (
+      <Card className="@container/card">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid lg:grid-cols-8 md:grid-cols-6 sm:grid-cols-4 grid-cols-3 grid-flow-row gap-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div className="flex items-center space-x-2" key={i}>
+              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-4 w-8" />
+            </div>
+          ))}
+        </CardContent>
+        <CardFooter>
+          <Skeleton className="h-9 w-40" />
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // --- Empty state (no supported bands for this category) -------------------
+  if (supportedBands.length === 0) {
+    return (
+      <Card className="@container/card">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No supported bands reported by the modem for this category.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid lg:grid-cols-8 md:grid-cols-6 sm:grid-cols-4 grid-cols-3 grid-flow-row gap-4">
-        {mockBands[bandType].map((band) => (
-          <div className="flex items-center space-x-2" key={band}>
-            <Checkbox
-              id={`${bandType}-${band}`}
-              checked={checkedBands.includes(band)}
-              onCheckedChange={() => handleCheckboxChange(band)}
-              className="hover:cursor-pointer"
-            />
-            <Label htmlFor={`${bandType}-${band}`} className="cursor-pointer">
-              {prefix}
-              {band}
-            </Label>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
           </div>
-        ))}
+          {isAllUnlocked ? (
+            <Badge
+              variant="outline"
+              className="bg-emerald-500/20 text-emerald-500 border-emerald-300/50"
+            >
+              <LockOpenIcon className="mr-1 h-3 w-3" />
+              All Unlocked
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="bg-amber-500/20 text-amber-500 border-amber-300/50"
+            >
+              <LockIcon className="mr-1 h-3 w-3" />
+              {currentLockedBands.length} / {supportedBands.length} Bands
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        {/* Quick actions row */}
+        <div className="flex items-center gap-2 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSelectAll}
+            disabled={isLocking}
+          >
+            Select All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSelectNone}
+            disabled={isLocking}
+          >
+            Clear
+          </Button>
+        </div>
+
+        {/* Band checkbox grid */}
+        <div className="grid lg:grid-cols-8 md:grid-cols-6 sm:grid-cols-4 grid-cols-3 grid-flow-row gap-4">
+          {supportedBands.map((band) => (
+            <div className="flex items-center space-x-2" key={band}>
+              <Checkbox
+                id={`${bandCategory}-${band}`}
+                checked={checkedBands.has(band)}
+                onCheckedChange={() => handleCheckboxChange(band)}
+                disabled={isLocking}
+                className="hover:cursor-pointer"
+              />
+              <Label
+                htmlFor={`${bandCategory}-${band}`}
+                className="cursor-pointer"
+              >
+                {formatBandName(bandCategory, band)}
+              </Label>
+            </div>
+          ))}
+        </div>
       </CardContent>
+
       <CardFooter>
         <div className="mt-3 flex items-center gap-x-2">
-          <Button>Lock Selected Bands</Button>
-          <Button size="icon">
+          <Button
+            onClick={handleLock}
+            disabled={isLocking || noneSelected || !hasChanges}
+          >
+            {isLocking ? "Applying…" : "Lock Selected Bands"}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleUnlockAll}
+            disabled={isLocking || isAllUnlocked}
+            title="Unlock all bands (reset)"
+          >
             <RotateCcwIcon />
           </Button>
         </div>
