@@ -109,11 +109,8 @@ rm -f "$STATE_FILE"
 # --- Launch apply in a detached session --------------------------------------
 qlog_info "Spawning profile apply for: $PROFILE_ID"
 
-if command -v setsid >/dev/null 2>&1; then
-    setsid "$APPLY_BIN" "$PROFILE_ID" >/dev/null 2>&1 &
-else
-    ( "$APPLY_BIN" "$PROFILE_ID" ) >/dev/null 2>&1 &
-fi
+# Detach via subshell (pure POSIX, no setsid needed)
+( "$APPLY_BIN" "$PROFILE_ID" ) >/dev/null 2>&1 &
 
 # Give the script time to start and write its PID file
 sleep 0.5

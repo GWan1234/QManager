@@ -145,8 +145,8 @@ if [ "$failover_enabled" = "true" ] && [ -x "$FAILOVER_SCRIPT" ]; then
         rm -f "$FAILOVER_PID_FILE"
     fi
 
-    # Spawn new watcher (detached, one-shot)
-    setsid "$FAILOVER_SCRIPT" &
+    # Spawn new watcher (detached via subshell — pure POSIX, no setsid needed)
+    ( "$FAILOVER_SCRIPT" ) >/dev/null 2>&1 &
     qlog_info "Failover watcher spawned"
     failover_armed="true"
 fi

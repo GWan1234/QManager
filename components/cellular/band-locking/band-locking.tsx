@@ -12,7 +12,6 @@ import {
   type BandCategory,
 } from "@/types/band-locking";
 import { DEFAULT_SCENARIOS } from "@/types/connection-scenario";
-import type { CarrierComponent } from "@/types/modem-status";
 import { InfoIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -66,7 +65,6 @@ const BandLockingComponent = () => {
     lockBands,
     unlockAll,
     toggleFailover,
-    refresh,
   } = useBandLocking();
   const {
     activeScenarioId,
