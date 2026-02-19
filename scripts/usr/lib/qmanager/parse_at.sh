@@ -812,3 +812,47 @@ parse_wan_ip() {
         esac
     fi
 }
+
+# =============================================================================
+# BAND SUPPORT: AT+QNWPREFCFG="policy_band" (Boot-only)
+# =============================================================================
+# Parses the modem's hardware-supported band lists.
+# Response format:
+#   +QNWPREFCFG: "gw_band",1:2:4:5:6:8:19
+#   +QNWPREFCFG: "lte_band",1:2:3:4:5:7:8:12:...
+#   +QNWPREFCFG: "nsa_nr5g_band",1:2:3:5:7:8:...
+#   +QNWPREFCFG: "nr5g_band",1:2:3:5:7:8:...
+#   +QNWPREFCFG: "nrdc_nr5g_band",1:2:3:5:7:8:...
+#
+# Sets: boot_supported_lte_bands, boot_supported_nsa_nr5g_bands,
+#        boot_supported_sa_nr5g_bands (colon-delimited strings)
+
+parse_policy_band() {
+    local raw="$1"
+
+    boot_supported_lte_bands=""
+    boot_supported_nsa_nr5g_bands=""
+    boot_supported_sa_nr5g_bands=""
+
+    # Extract colon-delimited band list after the key name for each type.
+    # Format per line: +QNWPREFCFG: "<key>",<bands>
+    local line
+
+    line=$(printf '%s\n' "$raw" | grep '"lte_band"' | head -1)
+    if [ -n "$line" ]; then
+        boot_supported_lte_bands=$(printf '%s' "$line" | sed 's/.*"lte_band",//' | tr -d '\r ')
+    fi
+
+    line=$(printf '%s\n' "$raw" | grep '"nsa_nr5g_band"' | head -1)
+    if [ -n "$line" ]; then
+        boot_supported_nsa_nr5g_bands=$(printf '%s' "$line" | sed 's/.*"nsa_nr5g_band",//' | tr -d '\r ')
+    fi
+
+    # grep -v excludes nsa_ and nrdc_ lines that also contain "nr5g_band"
+    line=$(printf '%s\n' "$raw" | grep '"nr5g_band"' | grep -v 'nsa_' | grep -v 'nrdc_' | head -1)
+    if [ -n "$line" ]; then
+        boot_supported_sa_nr5g_bands=$(printf '%s' "$line" | sed 's/.*"nr5g_band",//' | tr -d '\r ')
+    fi
+
+    qlog_debug "policy_band: LTE=$boot_supported_lte_bands NSA=$boot_supported_nsa_nr5g_bands SA=$boot_supported_sa_nr5g_bands"
+}

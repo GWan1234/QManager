@@ -224,6 +224,12 @@ export interface DeviceStatus {
   lte_category: string;
   /** Active MIMO layers, e.g. "LTE 1x4" or "LTE 1x4 | NR 2x4" (Tier 2, updates with signal conditions) */
   mimo: string;
+  /** Hardware-supported LTE bands, colon-delimited (boot-only, from AT+QNWPREFCFG="policy_band") */
+  supported_lte_bands: string;
+  /** Hardware-supported NSA NR5G bands, colon-delimited (boot-only) */
+  supported_nsa_nr5g_bands: string;
+  /** Hardware-supported SA NR5G bands, colon-delimited (boot-only) */
+  supported_sa_nr5g_bands: string;
 }
 
 export interface TrafficStatus {
