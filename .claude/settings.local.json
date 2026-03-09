@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(bun run build:*)",
-      "Bash(bun tsc:*)"
+      "Bash(bun tsc:*)",
+      "Bash(echo:*)"
     ]
   }
 }
