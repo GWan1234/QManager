@@ -5,7 +5,8 @@
       "Bash(bun run build:*)",
       "Bash(bun tsc:*)",
       "Bash(echo:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node -:*)"
     ]
   }
 }
