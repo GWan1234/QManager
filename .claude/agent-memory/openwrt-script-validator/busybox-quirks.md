@@ -20,6 +20,15 @@ type: project
 Using `[ "$var" -lt N ] 2>/dev/null` swallows the error when `$var` is non-numeric, making the test silently return false (non-zero). If guarding a range check, a non-numeric input passes validation.
 **How to apply:** Always add a `case "$var" in ''|*[!0-9]*) ... esac` guard before numeric `[ ]` comparisons when the input comes from user/POST data.
 
+### `local a b c` multi-variable declaration — UNSAFE on older BusyBox ash
+BusyBox ash's `local` builtin is non-standard. Declaring multiple variables on a single `local` line (`local a b c`) works in bash and newer ash builds but is not reliable on all OpenWRT targets.
+**Why:** Found repeatedly — in `email_alerts.sh` `check_email_alert()`, `_ea_log_event()`; in `qmanager_poller` `update_proc_metrics()` (4 lines), `collect_boot_data()`, `poll_tier2()`, `read_ping_data()`. Fixed to one declaration per line in all cases.
+**How to apply:** Always write one `local varname` per line in any function. Never `local a b c`. This is a recurring pattern — check every function when reviewing new or modified scripts.
+
+### `jq // empty` when value is always numeric — still flag it
+`.timestamp // empty` in `qmanager_poller` `read_ping_data()` was technically safe (timestamp is always an integer from `date +%s`), but violates the project rule.
+**How to apply:** Replace with `if . == null then empty else tostring end` regardless of whether the field can be boolean false. Consistency matters more than the theoretical safety of a specific call site.
+
 ## Confirmed Safe Patterns
 
 ### `jq -s 'reverse'` for NDJSON newest-first
