@@ -34,7 +34,10 @@
       "Bash(printf:*)",
       "Bash(do grep -H \"aria-label\" \"$file\")",
       "Bash(bun next build:*)",
-      "Bash(bash \"d:/Projects/QM PROJECT/QManager/.claude/check-crlf.sh\" \"d:/Projects/QM PROJECT/QManager/scripts/usr/lib/qmanager/parse_at.sh\" \"d:/Projects/QM PROJECT/QManager/scripts/usr/bin/qmanager_poller\")"
+      "Bash(bash \"d:/Projects/QM PROJECT/QManager/.claude/check-crlf.sh\" \"d:/Projects/QM PROJECT/QManager/scripts/usr/lib/qmanager/parse_at.sh\" \"d:/Projects/QM PROJECT/QManager/scripts/usr/bin/qmanager_poller\")",
+      "WebSearch",
+      "WebFetch(domain:tailscale.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

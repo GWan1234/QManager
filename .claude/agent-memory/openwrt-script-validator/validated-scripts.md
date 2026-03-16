@@ -6,6 +6,25 @@ type: project
 
 ## Validated Scripts
 
+### 2026-03-16 — Tailscale CGI Endpoint
+
+| Script                                     | Status           | LF               | Bashisms | jq Safety | Issues Fixed          |
+|--------------------------------------------|------------------|------------------|----------|-----------|-----------------------|
+| `scripts/cgi/quecmanager/vpn/tailscale.sh` | PASS (after fix) | Fixed (was CRLF) | 0        | All safe  | `pgrep -x` → `pidof` |
+
+#### Details
+
+- CRLF line endings present on creation (Windows dev env) — stripped immediately.
+- Line 42: `pgrep -x tailscaled` → `pidof tailscaled`. BusyBox `pgrep` does not reliably support `-x` (exact match) on all OpenWRT targets; `pidof` is a BusyBox applet with exact-match by design.
+- Line 390: `set_boot_enabled` uses correct safe jq boolean pattern: `if . == null then empty else tostring end`. No `// empty` trap.
+- `jq // "fallback"` on string-only fields (`.BackendState`, `.AuthURL`, etc.) is safe — these are never booleans.
+- `// false` and `// 0` defaults in peer/self jq constructs: harmless (default equals possible value; no misrepresentation).
+- `timeout` command guarded with `command -v timeout` — correct degradation pattern.
+- Background `tailscale up` via `( ... ) &` inside CGI: single-fork is acceptable since CGI exits and child is reparented to init.
+- `killall` (line 378): BusyBox applet — confirmed safe.
+
+Total issues: 1 fixed (CRLF + pgrep -x)
+
 ### 2026-03-15 — Email Alerts Feature (Final Audit: 3 scripts, all PASS)
 
 | Script | Status | LF | Multi-var | jq Safety | Issues |
