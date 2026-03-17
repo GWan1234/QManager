@@ -45,7 +45,11 @@
       "Bash(bash .claude/check-crlf.sh scripts/usr/bin/qmanager_poller)",
       "Bash(bash .claude/check-crlf.sh --fix scripts/cgi/quecmanager/device/about.sh)",
       "Bash(busybox ash:*)",
-      "Bash(bun remove:*)"
+      "Bash(bun remove:*)",
+      "Bash(npx tsc:*)",
+      "Bash(for f:*)",
+      "Bash(do sed:*)",
+      "Bash(file scripts/usr/lib/qmanager/cgi_auth.sh scripts/cgi/quecmanager/auth/*.sh scripts/usr/bin/qmanager_reset_password scripts/usr/lib/qmanager/cgi_base.sh)"
     ]
   }
 }
