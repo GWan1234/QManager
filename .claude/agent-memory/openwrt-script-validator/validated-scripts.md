@@ -6,6 +6,24 @@ type: project
 
 ## Validated Scripts
 
+### 2026-03-21 — OTA Update Scripts (update.sh, qmanager_update, install.sh)
+
+| Script | Status | LF | Bashisms | Issues Fixed |
+| --- | --- | --- | --- | --- |
+| `scripts/www/cgi-bin/quecmanager/system/update.sh` | PASS | OK | 0 | none |
+| `scripts/usr/bin/qmanager_update` | PASS | OK | 0 | none |
+| `scripts/install.sh` | PASS (after fix) | OK | 0 | glob chmod under `set -e` |
+
+#### Details
+
+- `update.sh`: `// empty` on tag_name/body/browser_download_url — safe (string fields, never boolean). `--argjson prerelease` receives UCI value "1"/"0" — valid JSON integers. Double-fork spawn pattern correct (line 298/313). `semver_compare()` heredoc `read` + POSIX `\>` / `\<` string comparison — valid ash.
+- `qmanager_update`: No bashisms. PID file write (`echo $$ > "$PID_FILE"`) — safe, `$$` is always a plain integer. `trap - EXIT INT TERM` before final `reboot` — valid POSIX trap reset.
+- `install.sh`: Bug fixed — line 373: `chmod 644 "$LIB_DIR"/*.sh` glob fails with non-zero exit when no `.sh` files present, killing installer under `set -e`. Replaced with `find "$LIB_DIR" -maxdepth 1 -name "*.sh" -exec chmod 644 {} \;`. `pidof` (line 525) is a BusyBox applet — safe.
+
+Total issues: 1 fixed (glob chmod in install.sh)
+
+---
+
 ### 2026-03-21 — qmanager-installer.sh (standalone installer)
 
 | Script                  | Status           | LF | Bashisms | Issues Fixed              |
