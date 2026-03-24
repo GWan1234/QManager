@@ -34,9 +34,13 @@
 ### Video Optimizer (DPI Evasion)
 
 - **Binary**: nfqws from zapret project, installed at `/usr/bin/nfqws`
+- **Not bundled**: nfqws is downloaded on demand from [zapret GitHub releases](https://github.com/bol-van/zapret/releases) via `qmanager_dpi_install` — avoids opkg dependency issues on custom firmware
+- **Installer**: `qmanager_dpi_install` — detects arch, fetches `openwrt-embedded.tar.gz`, extracts arch-specific binary, installs to `/usr/bin/nfqws`
+- **Installer state**: `/tmp/qmanager_dpi_install.json` (progress file), `/tmp/qmanager_dpi_install.pid` (singleton guard)
 - **Hostname list**: `/etc/qmanager/video_domains.txt` (curated video CDNs, excludes generic CDN domains)
 - **nftables rules**: NFQUEUE on wwan0, queue 200, `bypass` flag for graceful failure
 - **Strategies**: TCP SNI split (`--dpi-desync=split2`) + QUIC desync (`--dpi-desync-udplen-increment`)
 - **Verification**: `qmanager_dpi_verify` — curl with `--connect-to` SNI spoofing against speed.cloudflare.com
+- **Kernel support**: `dpi_check_kmod()` checks `/proc/config.gz` for `CONFIG_NETFILTER_NETLINK_QUEUE=y` (built-in) before trying lsmod/modprobe
 - **Init.d**: `qmanager_dpi` (procd, START=99, UCI-gated)
-- **Dependencies**: `kmod-nft-queue`, `libnetfilter-queue`, `libnfnetlink`, `libmnl`, full `curl` (not BusyBox)
+- **Dependencies**: `libnetfilter-queue`, `libnfnetlink`, `libmnl`, full `curl` (not BusyBox); kernel NFQUEUE support (built-in or `kmod-nft-queue`)
