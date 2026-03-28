@@ -16,7 +16,29 @@
 - **Typography:** Euclid Circular B (primary), Manrope (secondary). Clean, geometric, professional.
 - **Radius:** 0.65rem base — softly rounded, not pill-shaped.
 
+### Status Badge Pattern
+All status badges use `variant="outline"` with semantic color classes and `h-3 w-3` lucide icons. Never use solid badge variants (`variant="success"`, `variant="destructive"`, etc.) for status indicators.
+
+| State | Classes | Icon |
+| ----- | ------- | ---- |
+| Success/Active | `bg-success/15 text-success hover:bg-success/20 border-success/30` | `CheckCircle2Icon` |
+| Warning | `bg-warning/15 text-warning hover:bg-warning/20 border-warning/30` | `TriangleAlertIcon` |
+| Destructive/Error | `bg-destructive/15 text-destructive hover:bg-destructive/20 border-destructive/30` | `XCircleIcon` or `AlertCircleIcon` |
+| Info | `bg-info/15 text-info hover:bg-info/20 border-info/30` | Context-specific (`DownloadIcon`, `ClockIcon`, etc.) |
+| Muted/Disabled | `bg-muted/50 text-muted-foreground border-muted-foreground/30` | `MinusCircleIcon` |
+
+```tsx
+<Badge variant="outline" className="bg-success/15 text-success hover:bg-success/20 border-success/30">
+  <CheckCircle2Icon className="h-3 w-3" />
+  Active
+</Badge>
+```
+
+- Reusable `ServiceStatusBadge` component at `components/local-network/service-status-badge.tsx` for service running/inactive states
+- Choose muted for deliberately inactive states (Stopped, Offline peer, Disabled); destructive for failure/error states (Disconnected link, Failed email)
+
 ### Design Principles
+
 1. **Data clarity first** — Signal metrics, latency charts, and network status are the core experience. Every pixel should serve readability and quick comprehension. Use color, spacing, and hierarchy to make numbers scannable at a glance.
 2. **Progressive disclosure** — Show the essential information upfront; advanced controls and details are accessible but not overwhelming. A quick-check user and a deep-configuration user should both feel served.
 3. **Confidence through feedback** — Every action (save, reboot, apply profile) must have clear visual feedback: loading states, success confirmations, error messages. Users are changing real device settings — they need to trust what happened.
