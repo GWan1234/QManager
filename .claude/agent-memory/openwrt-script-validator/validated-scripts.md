@@ -6,6 +6,62 @@ type: project
 
 ## Validated Scripts
 
+### 2026-03-21 — OTA Update Scripts (update.sh, qmanager_update, install.sh)
+
+| Script | Status | LF | Bashisms | Issues Fixed |
+| --- | --- | --- | --- | --- |
+| `scripts/www/cgi-bin/quecmanager/system/update.sh` | PASS | OK | 0 | none |
+| `scripts/usr/bin/qmanager_update` | PASS | OK | 0 | none |
+| `scripts/install.sh` | PASS (after fix) | OK | 0 | glob chmod under `set -e` |
+
+#### Details
+
+- `update.sh`: `// empty` on tag_name/body/browser_download_url — safe (string fields, never boolean). `--argjson prerelease` receives UCI value "1"/"0" — valid JSON integers. Double-fork spawn pattern correct (line 298/313). `semver_compare()` `\>` / `\<` in `[ ]` — CONFIRMED NOT valid ash (BusyBox `[` does not support string ordering operators); fixed 2026-03-22 with sort+head pattern.
+- `qmanager_update`: No bashisms. PID file write (`echo $$ > "$PID_FILE"`) — safe, `$$` is always a plain integer. `trap - EXIT INT TERM` before final `reboot` — valid POSIX trap reset.
+- `install.sh`: Bug fixed — line 373: `chmod 644 "$LIB_DIR"/*.sh` glob fails with non-zero exit when no `.sh` files present, killing installer under `set -e`. Replaced with `find "$LIB_DIR" -maxdepth 1 -name "*.sh" -exec chmod 644 {} \;`. `pidof` (line 525) is a BusyBox applet — safe.
+
+Total issues: 1 fixed (glob chmod in install.sh)
+
+---
+
+### 2026-03-22 — OTA Update Scripts (re-audit + build.sh + installer re-audit)
+
+| Script | Status | LF | Issues Fixed |
+| --- | --- | --- | --- |
+| `scripts/www/cgi-bin/quecmanager/system/update.sh` | PASS (after fix) | OK | `\>` / `\<` in `[ ]`; `$reset_ts` empty guard |
+| `scripts/usr/bin/qmanager_update` | PASS | OK | none |
+| `build.sh` (dev machine, bash) | PASS (after fix) | OK | Operator precedence bug in copy-exclusion loop |
+| `qmanager-installer.sh` | PASS | OK | none (operational warning: hardcoded SHA-256) |
+
+#### Details
+
+- `update.sh` lines 114-115: `[ "$a_pre" \> "$b_pre" ]` — BusyBox `[` does NOT support `\>` / `\<` string ordering operators. Fixed with `sort | head -1` lexical comparison.
+- `update.sh` line 181: `$reset_ts` from HTTP header sed could be empty; added `[ -n "$reset_ts" ]` guard before `-gt` comparison.
+- `build.sh` line 34: `[ A ] || [ B ] && continue` parsed as `[ A ] || ([ B ] && continue)` — install.sh was never actually excluded from the scripts/* copy. Fixed with `case "$name" in install.sh|uninstall.sh) continue ;; esac`.
+- `qmanager-installer.sh`: EXPECTED_SHA256 hardcoded — will be stale after each new build. No automated sync mechanism. Operational concern, not a shell bug.
+- `qmanager_update`: Clean — no bashisms, correct trap/cleanup/cd patterns.
+
+---
+
+### 2026-03-21 — qmanager-installer.sh (standalone installer)
+
+| Script                  | Status           | LF | Bashisms | Issues Fixed              |
+|-------------------------|------------------|----|----------|---------------------------|
+| `qmanager-installer.sh` | PASS (after fix) | OK | 0        | `ls -lh` -> `du -k` (x2) |
+
+#### Details
+
+- Lines 128, 342: `ls -lh "$ARCHIVE_PATH" | awk '{print $5}'` — BusyBox `ls` does not support `-h`. Replaced with `du -k "$ARCHIVE_PATH" | awk '{print $1 "K"}'`.
+- Glob fallthrough pattern on lines 236/244 correctly guarded with `[ -e ]` / `[ -f ]`.
+- Color variables correctly collapsed to empty strings when not a terminal (line 45).
+- `clear 2>/dev/null || true` is guarded — safe even if `clear` unavailable.
+- `command -v`, `killall`, `crontab -l | grep -v | crontab -`, `uci`, `tar xzf -C` all safe.
+- `local` usage: one variable per declaration throughout — no multi-var `local` violations.
+
+Total issues: 1 fixed (`ls -lh` used twice)
+
+---
+
 ### 2026-03-16 — Tailscale CGI Endpoint
 
 | Script                                     | Status           | LF               | Bashisms | jq Safety | Issues Fixed          |
