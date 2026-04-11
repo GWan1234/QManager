@@ -6,6 +6,20 @@ type: project
 
 ## Validated Scripts
 
+### 2026-04-10 — Installer scripts re-validation (OpenWRT/BusyBox focus)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `qmanager-installer.sh` | PASS | OK | PASS | New uninstall additions for DPI/SMS/staged files remain POSIX-safe |
+| `scripts/install.sh` | PASS | OK | PASS | No bashisms detected; parser clean |
+| `qmanager_install/install_rm520n.sh` | FAIL for OpenWRT target | OK | FAIL | Uses `#!/bin/bash` and process substitution `done < <(...)`; script is systemd/Entware oriented, not OpenWRT ash |
+
+#### Details
+
+- `qmanager-installer.sh`: validated LF + `sh -n` clean; no forbidden ash constructs in modified uninstall blocks.
+- `scripts/install.sh`: validated LF + `sh -n` clean; no forbidden ash constructs.
+- `qmanager_install/install_rm520n.sh`: line 1 `#!/bin/bash`; line 461 process substitution `done < <(find ...)` is not supported by BusyBox ash. Also includes `systemctl`/`/lib/systemd/system` flow by design.
+
 ### 2026-03-21 — OTA Update Scripts (update.sh, qmanager_update, install.sh)
 
 | Script | Status | LF | Bashisms | Issues Fixed |

@@ -51,3 +51,10 @@ The in-place tail-trim pattern used for NDJSON log capping is correct for BusyBo
 | `qcmd` | Approved/available | Project-specific AT command tool |
 | `msmtp` | Optional external | Must be installed via `opkg install msmtp`; email_alerts.sh guards with `command -v msmtp` |
 | `tac` | NOT available | GNU coreutils only; use `jq -s 'reverse'` instead |
+
+## Validation Workflow Gotchas
+
+### `.claude/check-crlf.sh` can itself regress to CRLF
+The project-standard checker failed to execute because it had CRLF endings (`$'\r': command not found`, parse error at function definitions).
+**Why:** A validator run on 2026-04-10 could not use the checker directly; it had to normalize the checker text to LF temporarily before running file checks.
+**How to apply:** If checker execution fails with CR artifacts, normalize the checker to LF first, then run it on target scripts. Treat checker CRLF as a regression to fix promptly, because it blocks mandatory LF validation.
