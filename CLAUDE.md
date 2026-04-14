@@ -51,6 +51,35 @@ All status badges use `variant="outline"` with semantic color classes and `size-
 - **Primary action buttons**: Use default variant (not outline) for main actions like Record, Save, Apply. Use `SaveButton` component for save-specific actions with loading animation.
 - **Step-based progress**: Use `Loader2Icon` spinner + dot indicators for step/sample progress. Reserve fill/progress bars for data visualization (signal strength, quality meters) only.
 
+## Release Notes Formatting
+
+Use a simple changelog style for `RELEASE_NOTE.md` drafts.
+
+### Structure
+- Title line for the release version
+- One short intro sentence (1-2 lines max)
+- `## ✨ New Features`
+- `## ✅ Improvements`
+- `## 📥 Installation`
+- `## 💙 Thank You`
+
+### Writing Style
+- Keep wording user-facing and easy to scan
+- Prefer short bullets over long paragraphs
+- Focus on what changed and why users care
+- Avoid deep implementation details, internal function names, and long technical explanations
+- Keep each bullet concise and practical
+
+### Feature Prioritization
+- Put true headline features first under New Features
+- Use Improvements for fixes, reliability updates, and UI polish
+- Include only notable items for that release (no exhaustive internals dump)
+
+### Installation Section
+- Keep install and upgrade instructions short
+- Include the standard one-line fresh install command
+- Include a simple upgrade path line (Software Update flow)
+
 ## CGI Endpoint Reference (Additions)
 
 | Feature      | CGI Script                   | Hook                                                   | Types                | Reboot? |
