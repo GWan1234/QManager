@@ -6,6 +6,19 @@ type: project
 
 ## Validated Scripts
 
+### 2026-04-14 — parse_at.sh targeted validation (CGCONTRDP DNS parsing helpers)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `scripts/usr/lib/qmanager/parse_at.sh` | PASS with two warnings | OK (`git ls-files --eol`: `w/lf`) | PASS | `_is_ipv6_like_addr`, `_pick_preferred_dns`, and `parse_cgcontrdp` are ash-safe; warnings on predictable tmp filename and permissive IPv6-like detection |
+
+#### Details
+
+- Scope validated: helper functions `_is_ipv6_like_addr`, `_pick_preferred_dns`, and `parse_cgcontrdp` only.
+- Syntax check passed with `/bin/sh -n`.
+- Project CRLF checker `.claude/check-crlf.sh` remains non-executable in this workspace due CRLF; LF for target file verified via git EOL metadata.
+- Added DNS parsing in `parse_cgcontrdp` uses only BusyBox-available tools (`awk`, `sed`, `wc`, `tr`, `grep`, `head`, `rm`) and no bashisms.
+
 ### 2026-04-11 — install.sh targeted validation (detect_modem_firmware cache fallback + die message)
 
 | Script | Status | LF | BusyBox/POSIX | Notes |
