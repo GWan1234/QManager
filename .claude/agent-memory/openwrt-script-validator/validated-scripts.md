@@ -6,6 +6,58 @@ type: project
 
 ## Validated Scripts
 
+### 2026-04-14 — parse_at.sh targeted validation (CGCONTRDP DNS parsing helpers)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `scripts/usr/lib/qmanager/parse_at.sh` | PASS with two warnings | OK (`git ls-files --eol`: `w/lf`) | PASS | `_is_ipv6_like_addr`, `_pick_preferred_dns`, and `parse_cgcontrdp` are ash-safe; warnings on predictable tmp filename and permissive IPv6-like detection |
+
+#### Details
+
+- Scope validated: helper functions `_is_ipv6_like_addr`, `_pick_preferred_dns`, and `parse_cgcontrdp` only.
+- Syntax check passed with `/bin/sh -n`.
+- Project CRLF checker `.claude/check-crlf.sh` remains non-executable in this workspace due CRLF; LF for target file verified via git EOL metadata.
+- Added DNS parsing in `parse_cgcontrdp` uses only BusyBox-available tools (`awk`, `sed`, `wc`, `tr`, `grep`, `head`, `rm`) and no bashisms.
+
+### 2026-04-11 — install.sh targeted validation (detect_modem_firmware cache fallback + die message)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `scripts/install.sh` | PASS with one parsing warning | OK | PASS | New fallback path and updated preflight die message are ash-safe; cache extraction regex is greedy and can pick the last `"firmware"` key if schema ever includes duplicates |
+
+#### Details
+
+- Checked line endings with project checker logic by CR-stripping checker stream (checker file currently has CRLF in this workspace); target script result was `OK (LF)`.
+- `detect_modem_firmware()` additions are BusyBox-compatible: `for`, `sed`, `tr`, `grep -E`, `head`, and quoted tests only; no bashisms introduced.
+- `preflight()` die message now correctly reflects all attempted sources (ATI, AT+GMR, cache).
+- Parsing warning: line 289 regex `s/.*"firmware".../` is greedy and can return the last `"firmware"` occurrence if future cache schema adds another key with the same name.
+
+### 2026-04-11 — install.sh targeted update validation (reboot_system + non-interactive optional packages)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `scripts/install.sh` | PASS with one process blocker | OK (fallback-verified) | PASS | `reboot_system()` fallback chain is ash-safe; optional package prompt now handles non-interactive stdin via `[ -t 0 ]` + default path |
+
+#### Details
+
+- `reboot_system()` uses portable `command -v` and explicit fallback to `/sbin/reboot` then `busybox reboot`; no bash-only syntax introduced.
+- Optional package prompt handling is BusyBox-compatible: `read -r` is gated behind `[ -t 0 ]`, non-interactive mode avoids blocking and defaults to install optional packages.
+- Process blocker: project checker `.claude/check-crlf.sh` currently fails to execute due CRLF in the checker itself; LF on `scripts/install.sh` was validated using direct CR-byte scan fallback.
+
+### 2026-04-10 — Installer scripts re-validation (OpenWRT/BusyBox focus)
+
+| Script | Status | LF | BusyBox/POSIX | Notes |
+| --- | --- | --- | --- | --- |
+| `qmanager-installer.sh` | PASS | OK | PASS | New uninstall additions for DPI/SMS/staged files remain POSIX-safe |
+| `scripts/install.sh` | PASS | OK | PASS | No bashisms detected; parser clean |
+| `qmanager_install/install_rm520n.sh` | FAIL for OpenWRT target | OK | FAIL | Uses `#!/bin/bash` and process substitution `done < <(...)`; script is systemd/Entware oriented, not OpenWRT ash |
+
+#### Details
+
+- `qmanager-installer.sh`: validated LF + `sh -n` clean; no forbidden ash constructs in modified uninstall blocks.
+- `scripts/install.sh`: validated LF + `sh -n` clean; no forbidden ash constructs.
+- `qmanager_install/install_rm520n.sh`: line 1 `#!/bin/bash`; line 461 process substitution `done < <(find ...)` is not supported by BusyBox ash. Also includes `systemctl`/`/lib/systemd/system` flow by design.
+
 ### 2026-03-21 — OTA Update Scripts (update.sh, qmanager_update, install.sh)
 
 | Script | Status | LF | Bashisms | Issues Fixed |
