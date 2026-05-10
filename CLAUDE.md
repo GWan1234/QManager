@@ -49,7 +49,8 @@ Sections: `## ✨ New Features`, `## ✅ Improvements`, `## 📥 Installation`, 
 ### DPI Settings (Video Optimizer + Traffic Masquerade)
 - Routes: `/local-network/video-optimizer` (settings + CDN hostlist), `/local-network/traffic-masquerade`. Old `/local-network/dpi-masking` redirects.
 - Binary: `nfqws` from zapret, installed to `/usr/bin/nfqws` on demand by `qmanager_dpi_install` (arch-detect → fetch `openwrt-embedded.tar.gz`). State files: `/tmp/qmanager_dpi_install.{json,pid}`.
-- **Single shared nfqws on queue 200** — VO and masquerade are mutually exclusive modes of ONE process: single PID (`/var/run/nfqws.pid`), single nft rule set (comment `qmanager_dpi`). Backend enforces mutex in `save`/`save_masquerade`; init.d checks masquerade first, then VO.
+- **Single shared nfqws on queue 200** — VO and masquerade are mutually exclusive modes of ONE process: single PID (`/var/run/nfqws.pid`). Backend enforces mutex in `save`/`save_masquerade`; init.d checks masquerade first, then VO.
+- **nft rules are persistent**, shipped as `/etc/nftables.d/12-mangle-qmanager-dpi.nft` (chain `mangle_postrouting_qmanager_dpi`, `oifname "rmnet*"`, `queue num 200 bypass`). fw4 sources the file on every load/reload, so rules survive `fw4 reload` (VPN toggles, port-forward edits, mwan3 ipset refreshes, etc. — all of which used to silently wipe the runtime-injected rules). The `bypass` flag means rules are safe to leave permanent even when nfqws is not running. The init.d script never touches nftables — it only manages the daemon. `dpi_helper.sh` no longer has `dpi_insert_rules` / `dpi_remove_rules`. Uninstall removes the .nft file and drops the live chain.
 - Modes: VO = SNI split (`split2`) + QUIC desync, filtered by `--hostlist`. Masquerade = fake TLS ClientHello with spoofed SNI (default `speedtest.net`), all traffic.
 - Hostlist: `/etc/qmanager/video_domains.txt` (active) + `video_domains_default.txt` (immutable). Hostlist CGI supports GET `?section=hostlist`, POST `save_hostlist`, POST `restore_hostlist`.
 - GET handlers gate live stats on UCI `enabled` to avoid cross-mode contamination. Kernel check: `dpi_check_kmod()` reads `/proc/config.gz` for `CONFIG_NETFILTER_NETLINK_QUEUE=y`.
@@ -58,7 +59,7 @@ Sections: `## ✨ New Features`, `## ✅ Improvements`, `## 📥 Installation`, 
 
 ### Custom SIM Profiles
 - Route: `/cellular/custom-profiles`. IMEI is optional (empty = don't change).
-- **Async 3-step apply** (APN → TTL/HL → IMEI, least → most disruptive). Each step skips when unchanged. Worker: `qmanager_profile_apply`, polled via `profiles/apply_status.sh` at 500ms.
+- **Async 4-step apply** (APN → TTL/HL → IMEI → MPDN rule, least → most disruptive). Each step skips when unchanged. Worker: `qmanager_profile_apply`, polled via `profiles/apply_status.sh` at 500ms.
 - Active marker: `/etc/qmanager/active_profile` (plain text, profile ID). Written BEFORE `AT+CFUN=1,1` (USB reset can kill the script). Finalization re-writes on success/partial; clears on total failure.
 - Activate = runs full pipeline. Deactivate = clears marker only, zero modem changes.
 - **SIM mismatch**: poller `collect_boot_data()` auto-clears marker + emits `profile_deactivated` when active profile's `sim_iccid` ≠ current SIM. Empty `sim_iccid` = SIM-agnostic, left alone. Frontend shows "SIM Mismatch" warning badge.
@@ -66,6 +67,23 @@ Sections: `## ✨ New Features`, `## ✅ Improvements`, `## 📥 Installation`, 
 - **ICCID auto-apply**: `profile_mgr.sh::auto_apply_profile <iccid> <caller>` spawns worker detached. Called via `( . /usr/lib/qmanager/profile_mgr.sh && auto_apply_profile "$iccid" "<tag>" )` from: poller boot (`boot`), `cellular/settings.sh` post-SIM-switch (`sim_switch`, 3×1s ICCID retry), watchcat Tier 3 success (`watchdog`), watchcat SIM failover fallback (`watchdog_revert`, 3×1s retry).
 - Auto-apply guards: `profile_check_lock` (no race with manual Activate) + `profile_count > 0`. Worker's per-step skip logic is the single source of truth for "only apply what differs" — `auto_apply_profile` does NOT pre-compare.
 - Events: `profile_applied`/`profile_failed`/`profile_deactivated` in `dataConnection` tab.
+- **Lock layering — DO NOT collapse onto one file**: two distinct concerns, two files.
+  - `/tmp/qmanager_profile_spawn.lock` — owned by `apply.sh` CGI. Atomic-create via `set -C` noclobber. Rejects concurrent POSTs while the worker is coming up. Released after the CGI's poll loop confirms the worker is alive.
+  - `/tmp/qmanager_profile_apply.pid` — owned by the worker (`qmanager_profile_apply`). Singleton enforcement via `profile_acquire_lock`. Cleared by the worker's EXIT trap.
+  - Why two: the worker's `profile_acquire_lock` does `kill -0` on whatever PID it finds. If the CGI pre-wrote `$$` into the worker's PID file, the worker would see its own (still-sleeping) parent CGI as a foreign holder and abort. v0.1.22 hit this bug — manual Activate failed with `start_failed` while boot auto-apply still worked (boot path only `profile_check_lock`s, never acquires). Helpers: `profile_acquire_spawn_lock` / `profile_release_spawn_lock` / `profile_check_lock` / `profile_acquire_lock` in `profile_mgr.sh`.
+  - CGI must NEVER touch `$PROFILE_APPLY_PID_FILE`; worker must NEVER touch `$PROFILE_SPAWN_LOCK_FILE`.
+
+#### Verizon MPDN Handling (mno = "Verizon")
+- **Why**: RM551E + Verizon SIM only delivers Data + SMS via PDP context 3, not the default 1. Backend forces APN onto CID 3 and writes a QMAP MPDN rule (`AT+QMAP="mpdn_rule",0,3,0,0,1`) routing the WAN data session through PDP3.
+- **Form-level UX**: Selecting "Verizon" in `custom-profile-form.tsx` triggers an explicit `AlertDialog` warning the user not to manually release the rule (firmware quirk: bare release + reboot can brick the modem until firmware reflash). On confirm, CID is locked to 3 (input disabled with helper text) until the user switches MNO.
+- **MNO comparator**: backend AND frontend compare the literal label `"Verizon"` (NOT the preset id `"vzw"`) — that's what `MNO_PRESETS` stores into `profile.mno`. If you rename the preset label, you must update every `[ "$_x_mno" = "Verizon" ]` shell check in scripts (worker, apply.sh, deactivate.sh, ip_passthrough.sh, profile_mgr.sh).
+- **USB-mode pre-flight**: Verizon profiles require ECM (1) or RNDIS (3). `apply.sh` blocks pre-spawn with the `usb_mode_incompatible_for_verizon` error code if `AT+QCFG="usbnet"` returns 0 (RMNet) or 2 (MBIM). The worker has a defense-in-depth check too — fails all 4 steps with the same code if reached. Frontend resolves the code via `errors.json`. Note: `cgi_error` returns HTTP 200 with a JSON envelope (`{success:false, error:"...", detail:"..."}`), not a 4xx status — the frontend dispatches on the `error` field.
+- **Switching AWAY from Verizon**: any non-Verizon profile that activates while PDP3 is the active context runs the documented release-then-immediately-reset pair (`AT+QMAP="mpdn_rule",0` → `AT+QMAP="mpdn_rule",0,1,0,0,1`, NO sleep between, NO reboot before re-pin). NEVER issue a bare release. The two `qcmd` calls are intentionally back-to-back in `mpdn_revert_to_default` (`profile_mgr.sh`); future maintainers must not insert anything between them.
+- **Deferred reboot pattern**: revert step sets `apply_requires_reboot: true`. `deactivate.sh` returns `{ success, requires_reboot }`; frontend writes `setPendingReboot("verizon_revert")` (extends `lib/config-backup/pending-reboot.ts` source union). Persistent banner via `usePendingReboot` picks it up.
+- **Boot-path auto-revert**: `auto_apply_profile` in poller boot context — when SIM mismatch clears an active Verizon profile, it runs `mpdn_revert_to_default`, touches `/tmp/qmanager_pending_reboot_verizon`, emits `verizon_mpdn_reverted` warning event, then proceeds with the existing `profile_deactivated` warning event and marker clear.
+- **IP Passthrough lock**: when active profile is Verizon, `ip_passthrough.sh` POST blocks with `ip_passthrough_locked_by_verizon_profile` (via `cgi_error` — HTTP 200 envelope, not a 4xx). Frontend `ip-passthrough-card.tsx` uses `useActiveProfile()` (lightweight read-only hook in `hooks/use-active-profile.ts`, polls `/profiles/list.sh` every 30s) and renders an info `Alert` + disables the entire form via outer `<fieldset disabled>`. GET endpoint stays open so the disabled form still shows current values.
+- **New events** (both `dataConnection` tab): `verizon_mpdn_applied` (info), `verizon_mpdn_reverted` (info from CGI deactivate / warning from boot path).
+- **New error codes** (in `errors.json` × 4 locales): `usb_mode_incompatible_for_verizon`, `mpdn_rule_failed`, `mpdn_rule_revert_failed`, `ip_passthrough_locked_by_verizon_profile`, `partial_apply`, `all_steps_failed`.
 
 ### Configuration Backup and Restore
 - Route: `/system-settings/config-backup`. 8 sections: Network Mode + APN, LTE/5G bands, Tower Lock, TTL/HL, IMEI, Custom SIM Profiles, SMS Alerts, Watchdog.
@@ -107,6 +125,26 @@ Sections: `## ✨ New Features`, `## ✅ Improvements`, `## 📥 Installation`, 
 - **Sidebar**: Languages entry under System Settings (sibling of Software Update / AT Terminal / Luci, not inside the System Settings collapsible). `t_key: "languages"` resolves via `sidebar.items.languages`.
 - **LanguageSwitcher** lists bundled + installed packs. Downloadable-but-not-installed packs are hidden from the switcher — they only surface in the Languages card's Available section.
 - **i18next-icu is PINNED OUT** — native `_one`/`_other` plurals + default `{{var}}` interpolation handle every shipped string. Re-adding the plugin breaks plurals (Plan 4 post-ship incident — commit `00bdd9e`).
+
+#### Language Pack Publishing Workflow
+- **Builder**: `bun run package:lang <code> [version] [--publish] [--push] [--update-manifest <url>] [--contributors <csv>] [--skip-check]`. Implemented as a pure TypeScript file at `scripts-dev/build-lang-pack.ts` (not `scripts/` — that dir is OpenWRT staging and gets shipped to devices). Runs entirely inside one bun process to avoid bash→node/bun PATH resolution hell (see commit `c4f3708` for the bash-based attempt that was reverted).
+- **`scripts-dev/` convention**: dev-only tooling. Excluded from `tsconfig.json` (Bun ambient globals, different target). NOT copied into the firmware tarball by `build.sh`.
+- **Pipeline**: validates code registration in `available-languages.ts` → extracts `LP_REQUIRED_NS` from `language_packs.sh` → verifies namespace files → JSON-parses every `*.json` → runs `bun run i18n:check` → tars flat (`tar -czf <archive> -C <localeDir> *.json`, spawned with cwd=outDir and RELATIVE paths for cross-shell compat) → sha256 + size → writes `.sha256` sidecar → walks dotted scalar paths for `completeness` ratio vs EN → optionally patches `language-packs/manifest.json` (dedupe by code, sort, atomic tmp+rename).
+- **Windows tar quirk**: Windows ships two tar variants — `System32\tar.exe` (bsdtar, used in pwsh/cmd) and MSYS2 GNU tar (used in Git Bash). Absolute-path forms are incompatible between them (`D:/foo/bar` fails under MSYS2 tar which reads `D:` as an rcp remote host; `/d/foo/bar` fails under bsdtar). Builder sidesteps this by spawning tar with `cwd=outDir` + relative paths. **Different tar flavors produce different sha256 for the same source files** (header format, file ordering, gzip params all differ) — pick one shell per pack so the manifest-hosted sha stays stable across republishes. Recommended: pwsh (matches typical dev default).
+- **Recommended one-command publish** (same-day republish OK, tarball is deterministic if source files unchanged and shell is the same):
+  ```
+  bun run package:lang <code> --publish --push
+  bun run package:lang <code> --publish --push --contributors "@handle"
+  ```
+  `--publish` requires `gh` CLI + `gh auth login`. It uploads the tarball to the persistent `language-packs` GitHub Release (creates it on first run with `--latest=false` so it stays out of the firmware feed), replaces any existing asset of the same filename (`--clobber`), and auto-patches `language-packs/manifest.json`. `--push` then commits and pushes the manifest; skips gracefully if manifest is already up to date in git.
+- **Persistent release**: all language pack tarballs live as assets under a single `language-packs` release tag. Never delete this release. Per-code-version releases (`lang-it-2026.04.23` etc.) are legacy and no longer created.
+- **Manual publish** (fallback if `gh` unavailable):
+  1. `bun run package:lang <code> [--contributors "@handle"]` → writes tarball.
+  2. Upload asset to the `language-packs` GitHub Release manually.
+  3. `bun run package:lang <code> --update-manifest <asset-url> --push` → patches and commits manifest.
+- **`--contributors` preservation**: re-running without `--contributors` automatically reads the existing manifest entry and preserves the contributors field. Pass `--contributors` explicitly only to change or set it.
+- **GitHub raw CDN caches `raw.githubusercontent.com/.../development-home/manifest.json` for 5 min** (`max-age=300`). After push, devices see stale manifest until cache expires. Verify with `curl -sI <url> | grep -iE "cache-control|source-age"`. No workaround — inherent to the CDN choice. Manual install commands shown in the Languages card are generated from the (possibly stale) manifest sha — use the new command after the CDN revalidates if sha verification fails on-device.
+- **Default manifest URL**: `lib/i18n/language-pack-manifest.ts::DEFAULT_MANIFEST_URL` points at the `development-home` raw URL. Change here if switching branches or CDNs.
 
 ### Error Code Vocabulary (Plan 12+)
 
