@@ -6,36 +6,40 @@ See `docs/ARCHITECTURE.md`, `docs/BACKEND.md`, `docs/FRONTEND.md`, `docs/API-REF
 
 ## Design Context
 
-**Users**: hobbyist power users + field technicians managing Quectel modems on OpenWRT. Technically literate, not developers. Sessions range from quick checks to focused configuration.
+See **`PRODUCT.md`** (strategic: register, users, brand personality, anti-references, the six design principles including the safety principle, accessibility) and **`DESIGN.md`** (visual: OKLCH tokens, Manrope-only typography, status-badge pattern, hybrid elevation, mosaic dashboard composition, signature components — Topology Map / Circular Signal Meter / Live Data Tile, Apple-class motion contracts, full Do's and Don'ts).
 
-**Brand**: Modern, Approachable, Smart — premium tool that respects user intelligence without requiring modem-engineer knowledge.
+Quick reminders the visual spec enforces:
+- **Status badges**: always `variant="outline"` + `bg-{role}/15 text-{role} border-{role}/30` + `size-3` lucide icon. Solid variants are forbidden in feature surfaces. Reusable wrapper: `ServiceStatusBadge` at `components/local-network/service-status-badge.tsx`.
+- **CardHeader**: plain `CardTitle` + `CardDescription`. No icons in headers; they go in badges or `CardAction`.
+- **Save actions**: always use `SaveButton`.
+- **Single typeface**: Manrope only. No Geist Mono, no second font. Live numeric readouts use `font-variant-numeric: tabular-nums`.
+- **Dashboards**: varied-size mosaic (one hero widget + smaller tiles), never a uniform card grid.
 
-**Aesthetic**: Vercel/Linear polish meets Grafana/UniFi density. Light + dark first-class (OKLCH). Euclid Circular B (primary), Manrope (secondary). Radius `0.65rem`. Avoid terminal/legacy/consumer styling.
+## Probing the Live Modem (Development)
 
-### Status Badge Pattern
-All status badges: `variant="outline"` + semantic color classes + `size-3` lucide icons. Never solid variants.
+A live test modem is reachable on the LAN; **SSH credentials live in `.env`** (`SSH_HOST`, `SSH_USERNAME`, `SSH_PASSWORD`). When debugging backend behavior, reproducing CGI output, verifying a shell-script change actually runs under the device's BusyBox `/bin/sh`, or sanity-checking that a fix landed on disk, probe the device via PowerShell's **Posh-SSH** module rather than guessing from code alone.
 
-| State | Classes | Icon |
-| ----- | ------- | ---- |
-| Success | `bg-success/15 text-success hover:bg-success/20 border-success/30` | `CheckCircle2Icon` |
-| Warning | `bg-warning/15 text-warning hover:bg-warning/20 border-warning/30` | `TriangleAlertIcon` |
-| Destructive | `bg-destructive/15 text-destructive hover:bg-destructive/20 border-destructive/30` | `XCircleIcon` / `AlertCircleIcon` |
-| Info | `bg-info/15 text-info hover:bg-info/20 border-info/30` | Context-specific |
-| Muted | `bg-muted/50 text-muted-foreground border-muted-foreground/30` | `MinusCircleIcon` |
+One-time install (per dev machine):
 
-Reusable `ServiceStatusBadge` at `components/local-network/service-status-badge.tsx`. Use muted for deliberately inactive states; destructive for failure/error states.
+```powershell
+Install-Module Posh-SSH -Scope CurrentUser
+```
 
-### Design Principles
-1. **Data clarity first** — metrics scannable at a glance.
-2. **Progressive disclosure** — essentials upfront, advanced controls accessible.
-3. **Confidence through feedback** — every action shows loading/success/error.
-4. **Consistent** — shadcn/ui + design tokens uniformly, no one-off styles.
-5. **Responsive + resilient** — graceful loading/empty/error states, never blank.
+Quick pattern (read variables from `.env`, do NOT hardcode or echo secrets in transcripts):
 
-### UI Component Conventions
-- **CardHeader**: plain `CardTitle` + `CardDescription`, no icons (icons go in badges / action areas).
-- **Primary actions**: default variant (not outline). Use `SaveButton` for save actions.
-- **Step progress**: `Loader2Icon` spinner + dot indicators. Reserve fill bars for data viz (signal strength, quality meters) only.
+```powershell
+$cred = [pscredential]::new($env:SSH_USERNAME, (ConvertTo-SecureString $env:SSH_PASSWORD -AsPlainText -Force))
+$sess = New-SSHSession -ComputerName $env:SSH_HOST -Credential $cred -AcceptKey -Force
+(Invoke-SSHCommand -SessionId $sess.SessionId -Command 'uci show qmanager').Output
+Remove-SSHSession -SessionId $sess.SessionId | Out-Null
+```
+
+Use it to: read live UCI config, inspect `/tmp/qmanager_*.json` runtime state, tail `/tmp/qmanager.log` and other logs, hit a CGI endpoint with `curl http://127.0.0.1/cgi-bin/quecmanager/...`, check lock files (`/var/run/qmanager_*.pid`, `/tmp/qmanager_*.lock`), exercise `qcmd` AT calls, confirm `nft list ruleset` after a DPI toggle, verify init.d state, and re-read written config after an apply.
+
+**Safety:**
+- Treat the modem as a live system. Avoid destructive commands (reboots, `AT+CFUN=1,1`, factory resets, package removals, `rm -rf`) without a stated reason.
+- Never echo `.env` values back to the user or paste them into transcripts; reference the variable names instead.
+- `.env` should remain gitignored. Verify with `git check-ignore .env` before committing anything in the repo root.
 
 ## Release Notes (`RELEASE_NOTE.md`)
 
