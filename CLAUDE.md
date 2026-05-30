@@ -4,6 +4,55 @@ QManager is a Next.js (static export) frontend + OpenWRT CGI shell backend, depl
 
 See `docs/ARCHITECTURE.md`, `docs/BACKEND.md`, `docs/FRONTEND.md`, `docs/API-REFERENCE.md` for full breakdowns.
 
+## Change Workflow
+
+Every code-change request in this repo follows a tier-routed, 6-phase flow. Opus orchestrates; the specialist agents do the work. The user holds the approval gate. This flow is the project default for code changes and supersedes the generic brainstorming / writing-plans / verification skills; test-driven development still applies inside Phase 4 wherever tests exist.
+
+**Signal each phase transition** with a header so the user always knows where we are: `**[Phase 1 — Triage]**`, `**[Phase 2 — Plan]**`, `**[Phase 3 — Approval]**`, `**[Phase 4 — Execute]**`, `**[Phase 5 — Validation]**`, `**[Phase 6 — Docs & Close]**`.
+
+### The 6 Phases
+
+1. **Triage & Recon (Opus):** Classify the request into Tier 0–4 by blast radius. For every **bug fix**, every **Tier 3+** change, and **all Tier 4** work, dispatch `modem-investigator` as a read-only Phase 1 gate — it maps the UI→hook→CGI→`qcmd`→modem flow statically and probes live state via Posh-SSH before any code is written. It returns an evidence report (file paths with line numbers, captured CGI/UCI/nft/log output, findings), never code. Synthesize its findings.
+2. **Plan (Opus orchestrates, builders pre-flight):** For Tier 2+, dispatch builder agents in parallel — `backend-writer` (CGI / daemons / libs / init.d / AT flows) and/or `ui-builder` (pages / cards / hooks / types). They return scaffolding + design notes, NOT committed code. Opus synthesizes into ONE plan: tier, agent roster, file list, build order, risks, and the validation the change will need.
+3. **Approval Gate (user):** Plan changes here are cheap; later changes are not.
+4. **Execute (builders):** Bottom-up for cross-layer work: backend (poller / CGI / lib / init.d) → `validator` gate → hook → component → docs. Parallel where files are independent; sequential where there's a data dependency. `backend-writer` always hands off to `validator` after a meaningful backend change — the static audit is non-negotiable.
+5. **Validation (`validator`, mandatory):** After every backend / shell change, run `validator`. It is a single agent that performs both the static audit (CRLF via `.claude/check-crlf.sh`, BusyBox/POSIX compliance, bashisms, `jq` null-handling, lock/trap discipline, numeric-input guards, CGI envelope, reboot/CFUN safety) **and** scoped on-device SSH verification of the deployed change. Loop failures back to Phase 4 — but after **2 failed validation rounds**, stop and surface to the user instead of looping further.
+6. **Docs & Close (`docs-writer`):** Update `docs/`, the feature-doc routing tables in `CLAUDE.md` + `docs/features/README.md`, and `RELEASE_NOTE.md` as needed. Report summary + git status.
+
+### Tier Routing
+
+| Tier | Scope | Flow |
+|------|-------|------|
+| 0 | Typos, comments, copy edits, version bumps | Direct edit, no agents, no plan |
+| 1 | Single existing file in one layer | Skip Phase 2–3. Implement + `validator` (if shell) + maybe docs |
+| 2 | New feature, single layer | Full flow; pre-flight is the layer's builder only |
+| 3 | Cross-layer feature (CGI + hook + component, or a poller field consumed across layers) | Full flow; `modem-investigator` runs the Phase 1 recon gate |
+| 4 | Installer / `init.d` services / UCI schema / firewall (fw4 + nftables, incl. DPI nft rules) / OTA pipeline | Full flow with `modem-investigator` as a hard Phase 1 gate, and `validator` doing on-device verification of the deployed change |
+
+Bug fixes match the tier of the *fix*, not the bug — and always get a Phase 1 `modem-investigator` recon first, because "understand the live flow before touching it" is cheaper than a wrong fix. Pure refactors with no behavior change drop one tier (`validator` still runs for any shell change; builders don't pre-flight).
+
+### Agent Roster
+
+All agents are defined in `.claude/agents/`. Models are pinned per agent — the orchestrator does not choose them.
+
+- **Recon gate (Phase 1, read-only, Opus):** `modem-investigator` — traces the full stack statically and probes the live modem read-only via Posh-SSH; returns an evidence report and can halt work before code is written.
+- **Builders (Phases 2 & 4, Opus):** `backend-writer` (BusyBox `/bin/sh` backend — CGI, daemons, libs, init.d, AT/`qcmd` flows, UCI, apply pipelines, locks), `ui-builder` (Next.js / shadcn / Tailwind frontend; may delegate craft to the Impeccable skill).
+- **Validator (Phase 5, Sonnet):** `validator` — static BusyBox/CRLF/`jq` audit **and** scoped on-device verification. The closing gate before any backend change is done.
+- **Closer (Phase 6, Sonnet):** `docs-writer`.
+
+### Hard Rules
+
+- **Tier is decided once, up-front.** If tempted to skip the recon or the validator mid-flow, re-triage rather than skip.
+- **`validator` runs after every backend / shell change.** It is the single source of truth for BusyBox safety and on-device behavior; static-only passes have shipped broken scripts before, so let it do the on-device leg whenever the change is deployable.
+- **`modem-investigator` is read-only and fails loud.** If recon reveals the change needs a write action on live state, or surfaces a broken invariant, it halts and reports — the main thread re-routes through `backend-writer` + `validator`.
+- **`docs-writer` is the closing bracket.** If it doesn't run on Tier 2+, the change isn't done.
+- **Builders and validators don't see the orchestrator's conversation.** Each dispatch is a self-contained brief with file paths, schemas, the live evidence from `modem-investigator`, and the relevant `CLAUDE.md` / `DESIGN.md` / `PRODUCT.md` sections inlined.
+- **No in-flight reboot.** Any change that calls `reboot` / `AT+CFUN=1,1` mid-request must be deferred and surfaced via the deferred-reboot banner — `validator` rejects inline reboots in a CGI response path.
+
+### Skip Phrases
+
+User can short-circuit by saying "just do it" / "skip the plan" / "tier 0 it" — Opus drops to direct execution. Otherwise the flow is the default.
+
 ## Design Context
 
 See **`PRODUCT.md`** (strategic: register, users, brand personality, anti-references, the six design principles including the safety principle, accessibility) and **`DESIGN.md`** (visual: OKLCH tokens, Manrope-only typography, status-badge pattern, hybrid elevation, mosaic dashboard composition, signature components — Topology Map / Circular Signal Meter / Live Data Tile, Apple-class motion contracts, full Do's and Don'ts).
