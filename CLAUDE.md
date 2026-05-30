@@ -62,7 +62,8 @@ Quick reminders the visual spec enforces:
 - **CardHeader**: plain `CardTitle` + `CardDescription`. No icons in headers; they go in badges or `CardAction`.
 - **Save actions**: always use `SaveButton`.
 - **Single typeface**: Manrope only. No Geist Mono, no second font. Live numeric readouts use `font-variant-numeric: tabular-nums`.
-- **Dashboards**: varied-size mosaic (one hero widget + smaller tiles), never a uniform card grid.
+- **Page layout**: feature pages are a page header (`h1` + muted description) followed by a uniform grid of self-contained cards (the established shape, see `ttl-settings`). Apple-class professional UI/UX (macOS System Settings) is the north star, not UniFi's hero-mosaic. A hero/mosaic is a rare, deliberate exception for a genuine glance surface, never the default. UniFi is kept only for data density (dense outline pills / tables).
+- **Components**: use shadcn/ui primitives (tabs, accordion, dialog, popover, select, etc.) before hand-rolling; build custom only when shadcn does not provide one.
 
 ## Probing the Live Modem (Development)
 
