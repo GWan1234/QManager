@@ -63,6 +63,7 @@ Quick reminders the visual spec enforces:
 - **Save actions**: always use `SaveButton`.
 - **Single typeface**: Manrope only. No Geist Mono, no second font. Live numeric readouts use `font-variant-numeric: tabular-nums`.
 - **Page layout**: feature pages are a page header (`h1` + muted description) followed by a uniform grid of self-contained cards (the established shape, see `ttl-settings`). Apple-class professional UI/UX (macOS System Settings) is the north star, not UniFi's hero-mosaic. A hero/mosaic is a rare, deliberate exception for a genuine glance surface, never the default. UniFi is kept only for data density (dense outline pills / tables).
+- **Card-Wrapped Surface Rule**: a feature's settings live **inside one self-contained `Card`** (the card is the unit the page grid arranges), never spread across a full-bleed page with cards as loose parts. Traffic Engine + the `Add Profile` card are the reference; the earlier full-page Custom Profiles versions are the anti-pattern. See `DESIGN.md` ("The Card-Wrapped Surface Rule") + `PRODUCT.md` (Principle 4).
 - **Components**: use shadcn/ui primitives (tabs, accordion, dialog, popover, select, etc.) before hand-rolling; build custom only when shadcn does not provide one.
 
 ## Probing the Live Modem (Development)
