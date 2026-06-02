@@ -114,7 +114,7 @@ Detailed per-feature notes (apply pipelines, lock layering, contracts, gotchas, 
 | `/cellular/antenna-alignment`, alignment meter, antenna type toggle | [`docs/features/antenna-alignment.md`](docs/features/antenna-alignment.md) |
 | Bandwidth monitor, `bridge_traffic_monitor_rm551`, `websocat:8838`, UCI `quecmanager.bridge_monitor.*`, dashboard Live Traffic 5-state row | [`docs/features/bandwidth-monitor.md`](docs/features/bandwidth-monitor.md) |
 | Connection Scenarios, scenario schedule, `qmanager_scenario_schedule`, `scenario_mgr.sh`, band locking per profile, `qmanager_profile_scenario` cron, `scenario_locked_by_schedule` | [`docs/features/scenario-profile-binding.md`](docs/features/scenario-profile-binding.md) |
-| SMS inbox/send/delete (`cellular/sms.sh`), SMS alerts (`sms_alerts.sh`), `sms_tool` binary patches, `/dev/smd11` char-device invariant, shared lock, noise-filter defense-in-depth | [`docs/features/sms.md`](docs/features/sms.md) |
+| SMS inbox/send/delete (`cellular/sms.sh`), SMS alerts (`sms_alerts.sh`), `sms_tool` binary patches, `/dev/smd11` char-device invariant, shared lock, noise-filter defense-in-depth, `AT+CPMS` storage routing, dual ME+SM read/merge, `qmanager_sms_storage` boot daemon | [`docs/features/sms.md`](docs/features/sms.md) |
 | APN Management, WAN profiles, `cellular/apn.sh`, `apn_profiles.json`, Internet APN, "In Use" badge, COPS detach/attach cycle, IMS/SOS exclusion | [`docs/features/apn-management.md`](docs/features/apn-management.md) |
 
 Quick CGI / hook / type / reboot table for all extracted features lives in [`docs/features/README.md`](docs/features/README.md).
