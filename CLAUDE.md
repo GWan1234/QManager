@@ -119,6 +119,7 @@ Detailed per-feature notes (apply pipelines, lock layering, contracts, gotchas, 
 | APN Management, WAN profiles, `cellular/apn.sh`, `apn_profiles.json`, 5-slot radio model, save/activate/clear actions, "Active" badge, COPS detach/attach cycle, IMS/SOS context tagging (not exclusion), CID picker AlertDialog confirm | [`docs/features/apn-management.md`](docs/features/apn-management.md) |
 | Band Locking, `bands/current.sh`, `bands/lock.sh`, `qmanager_band_failover`, SA `nr5g_band` vs NR-DC `nrdc_nr5g_band` AT param mapping, SA grep-hazard guard, SA⇄NR-DC swap UX, `policy_band` vs `ue_capability_band`, `supported_bands.env` 4-field contract, "no zero-band lock" invariant | [`docs/features/band-locking.md`](docs/features/band-locking.md) |
 | Known-SIMs database, `sim_db.sh`, `known_iccids` persistent set, `sim_db_seed_if_absent` return semantics, byte-parity requirement, `system/known_sims.sh` CGI (list/clear), migration from retired `last_iccid`, `known-sims-row.tsx` | [`docs/features/known-sims.md`](docs/features/known-sims.md) |
+| Connection Quality settings, `qmanager_ping` HTTP-probe daemon, ping profiles (sensitive/regular/relaxed/quiet), `system/ping_profile.sh` CGI, `system/quality_thresholds.sh` CGI, `quecmanager.ping_profile.*`, `quecmanager.quality_thresholds.*`, reload flags, `isDefault` absence semantics | [`docs/features/connection-quality.md`](docs/features/connection-quality.md) |
 
 Quick CGI / hook / type / reboot table for all extracted features lives in [`docs/features/README.md`](docs/features/README.md).
 
